@@ -12,19 +12,22 @@ private:
     double particleVelocity[3];
     bool showWave;
     bool showParticle;
-    
+    double deBroglieLambda;
+    double standingWaveRatio;
+
 public:
-    WaveParticleModel(int atomicNumber = 1);
-    
+    WaveParticleModel(int atomicNumber = 1, int neutronNumber = 0);
+
     void update(double dt) override;
     void render() override;
     void reset() override;
-    
+
     void setShowWave(bool show);
     void setShowParticle(bool show);
-    
+
 private:
     double calculateWaveFunction(double x, double y, double z, double t) const;
+    void renderInfoPanel() const;
 };
 
 #endif // WAVE_PARTICLE_MODEL_H
