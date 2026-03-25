@@ -101,8 +101,12 @@ void WaveParticleModel::setShowParticle(bool show) {
 
 double WaveParticleModel::calculateWaveFunction(double x, double y, double z, double t) const {
     double r = sqrt(x*x + y*y + z*z);
+    if (r < 1e-8) {
+        return 0.0;
+    }
+
     double k = 2 * M_PI * waveFrequency / waveSpeed;
     double omega = 2 * M_PI * waveFrequency;
-    
+
     return waveAmplitude * sin(k * r - omega * t) / r;
 }

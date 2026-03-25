@@ -1,4 +1,5 @@
 #include "Utils.h"
+#include <cstdlib>
 
 // Mathematical constants definition
 const double Utils::PI = 3.14159265358979323846;

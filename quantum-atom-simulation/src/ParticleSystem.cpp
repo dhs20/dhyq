@@ -1,5 +1,6 @@
 #include "ParticleSystem.h"
 #include <GL/glut.h>
+#include <algorithm>
 
 // Particle class implementation
 Particle::Particle(double x, double y, double z, double vx, double vy, double vz, double lifetime, double size, double r, double g, double b) {
@@ -41,12 +42,15 @@ void ParticleSystem::addParticle(double x, double y, double z, double vx, double
 }
 
 void ParticleSystem::update(double dt) {
-    for (int i = particles.size() - 1; i >= 0; --i) {
-        particles[i].update(dt);
-        if (!particles[i].isAlive()) {
-            particles.erase(particles.begin() + i);
-        }
+    for (auto& particle : particles) {
+        particle.update(dt);
     }
+
+    particles.erase(
+        std::remove_if(particles.begin(), particles.end(), [](const Particle& particle) {
+            return !particle.isAlive();
+        }),
+        particles.end());
 }
 
 void ParticleSystem::render() {
