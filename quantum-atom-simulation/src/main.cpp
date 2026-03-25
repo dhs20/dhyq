@@ -2,9 +2,9 @@
 #include "BohrModel.h"
 #include "WaveParticleModel.h"
 #include "ThreeDRenderModel.h"
+#include "ElementData.h"
 #include <iostream>
 
-// Global variables
 AtomModel* currentModel;
 BohrModel bohrModel;
 WaveParticleModel waveParticleModel;
@@ -12,19 +12,32 @@ ThreeDRenderModel threeDRenderModel;
 int currentModelIndex = 0;
 bool isWireframe = false;
 
-// Window parameters
-int windowWidth = 800;
-int windowHeight = 600;
+int windowWidth = 1000;
+int windowHeight = 720;
 
-// Rotation parameters
 double rotateX = 0.0;
 double rotateY = 0.0;
 double zoom = 1.0;
+double panX = 0.0;
+double panY = 0.0;
 
-// Time parameters
 int lastTime = 0;
+int selectedElementIndex = 0;
 
-// Initialize OpenGL
+void applySelectedElement() {
+    const auto& element = ElementData::supportedElements()[selectedElementIndex];
+    bohrModel.setElementConfiguration(element.atomicNumber, element.neutronNumber);
+    waveParticleModel.setAtomicNumber(element.atomicNumber);
+    waveParticleModel.setNeutronNumber(element.neutronNumber);
+    threeDRenderModel.setAtomicNumber(element.atomicNumber);
+    threeDRenderModel.setNeutronNumber(element.neutronNumber);
+
+    std::cout << "Selected element: " << element.name
+              << " (" << element.symbol << ")"
+              << " Z=" << element.atomicNumber
+              << " N=" << element.neutronNumber << std::endl;
+}
+
 void initOpenGL() {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -32,7 +45,6 @@ void initOpenGL() {
     glClearColor(0.0, 0.0, 0.0, 1.0);
 }
 
-// Resize window
 void reshape(int width, int height) {
     windowWidth = width;
     windowHeight = height;
@@ -43,34 +55,29 @@ void reshape(int width, int height) {
     glMatrixMode(GL_MODELVIEW);
 }
 
-// Render function
 void render() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
-    
-    // Apply camera transformation
-    glTranslatef(0.0, 0.0, -10.0 * zoom);
+
+    glTranslatef(panX, panY, -10.0 * zoom);
     glRotatef(rotateX, 1.0, 0.0, 0.0);
     glRotatef(rotateY, 0.0, 1.0, 0.0);
-    
-    // Render current model
+
     currentModel->render();
-    
     glutSwapBuffers();
 }
 
-// Animation update function
 void update() {
     int currentTime = glutGet(GLUT_ELAPSED_TIME);
     double deltaTime = (currentTime - lastTime) / 1000.0;
     lastTime = currentTime;
-    
+
     currentModel->update(deltaTime);
     glutPostRedisplay();
 }
 
-// Keyboard event handling
 void keyboard(unsigned char key, int x, int y) {
+    const auto& elements = ElementData::supportedElements();
     switch (key) {
         case '1':
             currentModelIndex = 0;
@@ -84,29 +91,60 @@ void keyboard(unsigned char key, int x, int y) {
             currentModelIndex = 2;
             currentModel = &threeDRenderModel;
             break;
+        case 'n':
+            selectedElementIndex = (selectedElementIndex + 1) % elements.size();
+            applySelectedElement();
+            break;
+        case 'b':
+            selectedElementIndex = (selectedElementIndex + elements.size() - 1) % elements.size();
+            applySelectedElement();
+            break;
+        case 'u':
+            bohrModel.triggerTransition(true);
+            break;
+        case 'j':
+            bohrModel.triggerTransition(false);
+            break;
+        case 't':
+            bohrModel.toggleAutoTransition();
+            break;
+        case 'k':
+            threeDRenderModel.nextQuantumPreset();
+            break;
+        case '[':
+            threeDRenderModel.setProbabilityThreshold(0.04);
+            break;
+        case ']':
+            threeDRenderModel.setProbabilityThreshold(0.2);
+            break;
         case 'w':
             isWireframe = !isWireframe;
-            if (isWireframe) {
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-            } else {
-                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-            }
+            glPolygonMode(GL_FRONT_AND_BACK, isWireframe ? GL_LINE : GL_FILL);
             break;
         case 'p':
-            if (currentModel->getIsPlaying()) {
-                currentModel->pause();
-            } else {
-                currentModel->play();
-            }
+            if (currentModel->getIsPlaying()) currentModel->pause();
+            else currentModel->play();
             break;
         case 'r':
             currentModel->reset();
             break;
         case '+':
-            currentModel->setSpeed(currentModel->getSpeed() * 1.5);
+            currentModel->setSpeed(currentModel->getSpeed() * 1.25);
             break;
         case '-':
-            currentModel->setSpeed(currentModel->getSpeed() / 1.5);
+            currentModel->setSpeed(currentModel->getSpeed() / 1.25);
+            break;
+        case 'a':
+            panX -= 0.2;
+            break;
+        case 'd':
+            panX += 0.2;
+            break;
+        case 's':
+            panY -= 0.2;
+            break;
+        case 'x':
+            panY += 0.2;
             break;
         case 'q':
             exit(0);
@@ -114,80 +152,59 @@ void keyboard(unsigned char key, int x, int y) {
     }
 }
 
-// Mouse event handling
-void mouse(int button, int state, int x, int y) {
-    // Can add mouse interaction functionality
-}
-
-// Mouse move event handling
 void mouseMove(int x, int y) {
     static int lastX = x;
     static int lastY = y;
-    
+
     rotateY += (x - lastX) * 0.5;
     rotateX += (y - lastY) * 0.5;
-    
+
     lastX = x;
     lastY = y;
 }
 
-// Mouse wheel event handling
 void mouseWheel(int wheel, int direction, int x, int y) {
-    if (direction > 0) {
-        zoom *= 0.9;
-    } else {
-        zoom *= 1.1;
-    }
-    
+    (void)wheel;
+    (void)x;
+    (void)y;
+
+    if (direction > 0) zoom *= 0.9;
+    else zoom *= 1.1;
+
     if (zoom < 0.1) zoom = 0.1;
     if (zoom > 5.0) zoom = 5.0;
 }
 
-// Main function
 int main(int argc, char** argv) {
     std::cout << "Initializing GLUT..." << std::endl;
-    
-    // Initialize GLUT
+
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(windowWidth, windowHeight);
-    
-    std::cout << "Creating window..." << std::endl;
-    int windowId = glutCreateWindow("Quantum Atom Simulation");
-    
+
+    int windowId = glutCreateWindow("Quantum Atom Simulation (Classical + Quantum)");
     if (windowId == 0) {
         std::cerr << "Error: Failed to create GLUT window" << std::endl;
         return 1;
     }
-    
-    std::cout << "Window created successfully. ID: " << windowId << std::endl;
-    
-    // Initialize OpenGL
-    std::cout << "Initializing OpenGL..." << std::endl;
+
     initOpenGL();
-    
-    // Set callback functions
-    std::cout << "Setting callback functions..." << std::endl;
     glutDisplayFunc(render);
     glutReshapeFunc(reshape);
     glutIdleFunc(update);
     glutKeyboardFunc(keyboard);
-    glutMouseFunc(mouse);
     glutMotionFunc(mouseMove);
-    
-    // Set mouse wheel callback if available
-    #ifdef GLUT_WHEEL_UP
+
+#ifdef GLUT_WHEEL_UP
     glutMouseWheelFunc(mouseWheel);
-    std::cout << "Mouse wheel callback set" << std::endl;
-    #endif
-    
-    // Set default model
-    std::cout << "Setting default model to Bohr model..." << std::endl;
+#endif
+
     currentModel = &bohrModel;
-    
-    // Start main loop
-    std::cout << "Starting GLUT main loop..." << std::endl;
+    applySelectedElement();
+
+    std::cout << "Controls: 1/2/3 model, n/b element, u/j transition, t auto transition, k quantum preset" << std::endl;
+    std::cout << "Camera: drag rotate, wheel zoom, a/d/s/x pan" << std::endl;
+
     glutMainLoop();
-    
     return 0;
 }
