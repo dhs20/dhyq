@@ -1,0 +1,43 @@
+{
+    arch = "x64",
+    artifacts = {
+        installdir = [[D:\project\dhyq\.xmake-pkg-install\i\implot\v0.17\3da744c0e9a14cc099f23a91bc309732]]
+    },
+    configs = {
+        debug = false,
+        pic = true,
+        runtimes = "MD",
+        shared = false
+    },
+    deps = {
+        imgui = {
+            buildhash = "077e135418a04125b335c82192ad5a92",
+            version = "v1.92.6"
+        }
+    },
+    description = "Immediate Mode Plotting",
+    envs = { },
+    librarydeps = {
+        "imgui"
+    },
+    license = "MIT",
+    mode = "release",
+    name = "implot",
+    pathenvs = {
+        "ACLOCAL_PATH",
+        "CMAKE_PREFIX_PATH",
+        "DYLD_LIBRARY_PATH",
+        "LD_LIBRARY_PATH",
+        "PATH",
+        "PKG_CONFIG_PATH",
+        "PYTHONPATH"
+    },
+    plat = "windows",
+    repo = {
+        branch = "master",
+        commit = "75c3fcffb897a8aeb37863c495b9f58266216b26",
+        name = "xmake-repo",
+        url = "https://github.com/xmake-io/xmake-repo.git"
+    },
+    version = "v0.17"
+}

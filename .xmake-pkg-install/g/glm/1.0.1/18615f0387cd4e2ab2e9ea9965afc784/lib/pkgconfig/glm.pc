@@ -1,0 +1,13 @@
+# Modified by Xmake: Using relative paths to make package relocatable
+installdir=${pcfiledir}/../..
+prefix=${installdir}
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: glm
+Description: OpenGL Mathematics (GLM)
+Version: 1.0.1
+Libs:  -L${libdir}
+Libs.private: 
+Cflags:  -I${includedir}

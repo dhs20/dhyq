@@ -1,0 +1,38 @@
+{
+  "scenes": [
+    {
+      "name": "Hydrogen Lyman/Balmer",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "approximation": "strict_hydrogenic",
+      "model": "compare",
+      "transition": { "initial": [2, 1, 0], "final": [1, 0, 0] },
+      "components": [
+        { "qn": [2, 1, 0], "amplitude": 1.0, "phase": 0.0 }
+      ]
+    },
+    {
+      "name": "Helium Ion 3d",
+      "atomic_number": 2,
+      "charge_state": 1,
+      "approximation": "strict_hydrogenic",
+      "model": "schrodinger_cloud",
+      "transition": { "initial": [3, 2, 0], "final": [2, 1, 0] },
+      "components": [
+        { "qn": [3, 2, 0], "amplitude": 1.0, "phase": 0.0 }
+      ]
+    },
+    {
+      "name": "Ne Approximate 2p Superposition",
+      "atomic_number": 10,
+      "charge_state": 0,
+      "approximation": "multi_electron_approximation",
+      "model": "compare",
+      "transition": { "initial": [2, 1, 0], "final": [1, 0, 0] },
+      "components": [
+        { "qn": [2, 1, 0], "amplitude": 0.8, "phase": 0.0 },
+        { "qn": [2, 1, 1], "amplitude": 0.6, "phase": 1.57 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+    cmdlines = {
+        [[xmake lua "C:\\Program Files\\xmake\\modules\\private\\utils\\statistics.lua" --diagnosis --verbose]],
+        "xmake f -c",
+        "xmake f -c",
+        "xmake f -c -y",
+        "xmake f -c -y",
+        "xmake -y",
+        "xmake f -c -y",
+        "xmake -y",
+        "xmake -y",
+        "xmake f -c -y",
+        "xmake -y",
+        "xmake -y",
+        "xmake -y",
+        "xmake -y",
+        "xmake -y",
+        "xmake -y",
+        "xmake -y",
+        "xmake -y",
+        "xmake -y",
+        "xmake -y"
+    }
+}

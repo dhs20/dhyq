@@ -1,0 +1,39 @@
+{
+    files = {
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\app\Application.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\app\main.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\core\Logger.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\core\Paths.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\core\PerformanceTracker.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\physics\AtomicPhysics.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\physics\CloudGenerator.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\physics\ElementDatabase.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\physics\NumericalSolver.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\render\Camera.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\render\GLObjects.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\render\SceneRenderer.cpp.obj]],
+        [[build\.objs\quantum_atom_simulation\windows\x64\release\ui\AppUi.cpp.obj]]
+    },
+    values = {
+        [[D:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\link.exe]],
+        {
+            "-nologo",
+            "-dynamicbase",
+            "-nxcompat",
+            "-machine:x64",
+            [[-libpath:D:\project\dhyq\.xmake-pkg-install\g\glew\2.2.0\b624c40e764e48a2989368361626750b\lib]],
+            [[-libpath:D:\project\dhyq\.xmake-pkg-install\i\imgui\v1.92.6-docking\deffc05e62384fc79b7c0bf916fa03d3\lib]],
+            [[-libpath:D:\project\dhyq\.xmake-pkg-install\g\glfw\3.4\d59f6dd71e7647cc95d2c1d35e51a39a\lib]],
+            "/opt:ref",
+            "/opt:icf",
+            "glew32s.lib",
+            "imgui.lib",
+            "glfw3.lib",
+            "opengl32.lib",
+            "imm32.lib",
+            "user32.lib",
+            "shell32.lib",
+            "gdi32.lib"
+        }
+    }
+}

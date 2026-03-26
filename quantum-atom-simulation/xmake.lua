@@ -1,36 +1,34 @@
--- Basic build rules
+set_project("quantum-atom-simulation")
+set_version("0.2.0")
+set_languages("cxx20")
 add_rules("mode.debug", "mode.release")
 
--- Force use MSVC toolchain
-set_toolchains("msvc")
-
--- Disable auto-generated C++ standard flags (fix --std:c++11 warning)
-set_policy("build.langs.auto_flags", false)
-
--- Project name
-set_project("QuantumAtomSimulation")
-
--- ==================== Windows + MSVC Specific Config ====================
 if is_plat("windows") then
-    -- Fix Chinese garbled code: force MSVC to read UTF-8 files
     add_cxxflags("/utf-8", {force = true})
-    -- Set C++11 standard (MSVC specific format)
-    add_cxxflags("/std:c++11", {force = true})
-else
-    -- For Linux/macOS (GCC/Clang)
-    add_cxxflags("-std=c++11", {force = true})
 end
 
--- ==================== Dependency Management ====================
-add_requires("freeglut", "opengl")
+add_requires("glfw 3.4")
+add_requires("glew 2.2.0")
+add_requires("glm 1.0.1")
+add_requires("nlohmann_json v3.11.3")
+add_requires("imgui v1.92.6-docking", {configs = {glfw = true, opengl3 = true}})
 
--- ==================== Target Configuration ====================
-target("QuantumAtomSimulation")
+target("quantum_atom_simulation")
     set_kind("binary")
-    add_files("src/*.cpp")
+    add_files("app/**.cpp", "core/**.cpp", "physics/**.cpp", "render/**.cpp", "ui/**.cpp")
     add_includedirs("include")
-    add_packages("freeglut", "opengl")
-    -- Link Windows system libraries
+    add_packages("glfw", "glew", "glm", "nlohmann_json", "imgui")
+    add_defines("GLEW_STATIC")
     if is_plat("windows") then
-        add_links("user32", "gdi32", "opengl32", "glu32", "freeglut")
+        add_syslinks("opengl32", "gdi32", "shell32", "user32")
+    elseif is_plat("linux") then
+        add_syslinks("dl", "pthread")
     end
+    set_rundir("$(projectdir)")
+
+target("quantum_atom_tests")
+    set_kind("binary")
+    set_group("tests")
+    add_files("tests/**.cpp", "core/**.cpp", "physics/**.cpp")
+    add_includedirs("include")
+    add_packages("glm", "nlohmann_json")

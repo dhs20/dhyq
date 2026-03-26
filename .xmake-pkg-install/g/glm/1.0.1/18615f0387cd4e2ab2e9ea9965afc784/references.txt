@@ -1,0 +1,3 @@
+{
+    ["D:\\project\\dhyq\\quantum-atom-simulation"] = "260326"
+}

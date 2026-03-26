@@ -1,0 +1,22 @@
+{
+  "elements": [
+    { "atomic_number": 1, "symbol": "H", "name": "Hydrogen", "atomic_mass_u": 1.00784 },
+    { "atomic_number": 2, "symbol": "He", "name": "Helium", "atomic_mass_u": 4.002602 },
+    { "atomic_number": 3, "symbol": "Li", "name": "Lithium", "atomic_mass_u": 6.94 },
+    { "atomic_number": 4, "symbol": "Be", "name": "Beryllium", "atomic_mass_u": 9.0121831 },
+    { "atomic_number": 5, "symbol": "B", "name": "Boron", "atomic_mass_u": 10.81 },
+    { "atomic_number": 6, "symbol": "C", "name": "Carbon", "atomic_mass_u": 12.011 },
+    { "atomic_number": 7, "symbol": "N", "name": "Nitrogen", "atomic_mass_u": 14.007 },
+    { "atomic_number": 8, "symbol": "O", "name": "Oxygen", "atomic_mass_u": 15.999 },
+    { "atomic_number": 9, "symbol": "F", "name": "Fluorine", "atomic_mass_u": 18.998403163 },
+    { "atomic_number": 10, "symbol": "Ne", "name": "Neon", "atomic_mass_u": 20.1797 },
+    { "atomic_number": 11, "symbol": "Na", "name": "Sodium", "atomic_mass_u": 22.98976928 },
+    { "atomic_number": 12, "symbol": "Mg", "name": "Magnesium", "atomic_mass_u": 24.305 },
+    { "atomic_number": 13, "symbol": "Al", "name": "Aluminium", "atomic_mass_u": 26.9815385 },
+    { "atomic_number": 14, "symbol": "Si", "name": "Silicon", "atomic_mass_u": 28.085 },
+    { "atomic_number": 15, "symbol": "P", "name": "Phosphorus", "atomic_mass_u": 30.973761998 },
+    { "atomic_number": 16, "symbol": "S", "name": "Sulfur", "atomic_mass_u": 32.06 },
+    { "atomic_number": 17, "symbol": "Cl", "name": "Chlorine", "atomic_mass_u": 35.45 },
+    { "atomic_number": 18, "symbol": "Ar", "name": "Argon", "atomic_mass_u": 39.948 }
+  ]
+}

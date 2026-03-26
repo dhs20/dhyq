@@ -1,0 +1,43 @@
+{
+    arch = "x64",
+    artifacts = {
+        installdir = [[D:\project\dhyq\.xmake-pkg-install\g\glm\1.0.1\18615f0387cd4e2ab2e9ea9965afc784]],
+        remotedir = [[C:\Users\runneradmin\AppData\Local\.xmake\packages\g\glm\1.0.1\18615f0387cd4e2ab2e9ea9965afc784]]
+    },
+    configs = {
+        cxx_standard = "14",
+        debug = false,
+        header_only = true,
+        modules = false,
+        pic = true,
+        runtimes = "MD",
+        shared = false
+    },
+    description = "OpenGL Mathematics (GLM)",
+    envs = {
+        PATH = {
+            "bin"
+        }
+    },
+    kind = "library",
+    license = "MIT",
+    mode = "release",
+    name = "glm",
+    pathenvs = {
+        "ACLOCAL_PATH",
+        "CMAKE_PREFIX_PATH",
+        "DYLD_LIBRARY_PATH",
+        "LD_LIBRARY_PATH",
+        "PATH",
+        "PKG_CONFIG_PATH",
+        "PYTHONPATH"
+    },
+    plat = "windows",
+    repo = {
+        branch = "master",
+        commit = "75c3fcffb897a8aeb37863c495b9f58266216b26",
+        name = "xmake-repo",
+        url = "https://github.com/xmake-io/xmake-repo.git"
+    },
+    version = "1.0.1"
+}

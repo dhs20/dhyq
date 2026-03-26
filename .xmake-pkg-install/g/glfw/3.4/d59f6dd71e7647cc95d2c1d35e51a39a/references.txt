@@ -1,0 +1,5 @@
+{
+    ["D:\\project\\dhyq\\.xmake-pkg-cache\\2603\\i\\imgui\\v1.92.6\\source"] = "260326",
+    ["D:\\project\\dhyq\\.xmake-pkg-cache\\2603\\i\\imgui\\v1.92.6-docking\\source"] = "260326",
+    ["D:\\project\\dhyq\\quantum-atom-simulation"] = "260326"
+}

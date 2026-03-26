@@ -1,129 +1,98 @@
 # Quantum Atom Simulation
 
-## 项目简介
+Modernized 3D atomic visualization system with:
 
-这是一个使用C++和OpenGL实现的量子原子模拟项目，旨在通过可视化方式展示量子物理中的各种模型和概念。该项目具有高度的物理准确性和良好的可视化效果，适合用于教育教学目的。
+- OpenGL 3.3 Core rendering
+- GLFW windowing
+- ImGui Docking GUI
+- SI-based hydrogenic physics
+- data-driven element database
+- Bohr transitions and spectrum view
+- phase-colored Schrodinger probability clouds
+- Slater-rule multi-electron teaching approximation
+- finite-difference radial solver with convergence reporting
+- physics/math validation target
 
-## 功能特性
+## Build
 
-- **玻尔模型**：展示电子在固定轨道上围绕原子核运动的经典模型
-- **波粒二象性模型**：展示电子同时具有波动性和粒子性的特性
-- **3D概率云模型**：展示电子在原子核周围的概率分布，包括s、p、d等不同类型的轨道
-- **交互式控制**：支持模型切换、动画控制、视角旋转和缩放
+Prerequisites:
 
-## 项目结构
+- Windows with MSVC and xmake
 
-```
-quantum-atom-simulation/
-├── CMakeLists.txt          # CMake构建配置文件
-├── include/                # 头文件目录
-│   ├── Utils.h             # 数学工具函数
-│   ├── ParticleSystem.h    # 粒子系统
-│   ├── AnimationController.h # 动画控制器
-│   ├── AtomModel.h         # 原子模型基类
-│   ├── BohrModel.h         # 玻尔模型
-│   ├── WaveParticleModel.h # 波粒二象性模型
-│   └── ThreeDRenderModel.h # 3D渲染模型
-├── src/                    # 源文件目录
-│   ├── Utils.cpp           # 数学工具函数实现
-│   ├── ParticleSystem.cpp  # 粒子系统实现
-│   ├── AnimationController.cpp # 动画控制器实现
-│   ├── AtomModel.cpp       # 原子模型基类实现
-│   ├── BohrModel.cpp       # 玻尔模型实现
-│   ├── WaveParticleModel.cpp # 波粒二象性模型实现
-│   ├── ThreeDRenderModel.cpp # 3D渲染模型实现
-│   └── main.cpp            # 主程序入口
-└── README.md               # 项目说明文档
+Commands:
+
+```powershell
+$env:XMAKE_GLOBALDIR='D:\project\dhyq\.xmake-global'
+$env:XMAKE_PKG_CACHEDIR='D:\project\dhyq\.xmake-pkg-cache'
+$env:XMAKE_PKG_INSTALLDIR='D:\project\dhyq\.xmake-pkg-install'
+xmake f -c -y
+xmake -y
 ```
 
-## 构建与运行
+Binary output:
 
-### 前提条件
+- `build/windows/x64/release/quantum_atom_simulation.exe`
+- `build/windows/x64/release/quantum_atom_tests.exe`
 
-- C++编译器（支持C++11标准）
-- OpenGL库
-- GLUT库
-- CMake（用于构建项目）
+## Run
 
-### 构建步骤
+Application:
 
-1. 克隆或下载项目到本地
-2. 创建构建目录并进入：
-   ```bash
-   mkdir build
-   cd build
-   ```
-3. 运行CMake生成构建文件：
-   ```bash
-   cmake ..
-   ```
-4. 编译项目：
-   ```bash
-   cmake --build .
-   ```
-5. 运行可执行文件：
-   ```bash
-   ./QuantumAtomSimulation
-   ```
+```powershell
+build\windows\x64\release\quantum_atom_simulation.exe
+```
 
-## 交互控制
+Tests:
 
-### 键盘控制
+```powershell
+build\windows\x64\release\quantum_atom_tests.exe
+```
 
-- **1**：切换到玻尔模型
-- **2**：切换到波粒二象性模型
-- **3**：切换到3D概率云模型
-- **w**：切换线框/填充模式
-- **p**：暂停/播放动画
-- **r**：重置当前模型
-- **+**：增加动画速度
-- **-**：减少动画速度
-- **q**：退出程序
+## GUI Panels
 
-### 鼠标控制
+- `Scene`: 3D viewport with orbit rings, point clouds, and volume slices
+- `Inspector`: element, charge, model, transition, cloud, and solver controls
+- `Physics`: current formulas, units, `Z_eff`, transition values, and solver status
+- `Plots`: energy levels, spectra, radial distribution, and convergence
+- `Performance`: FPS, CPU/GPU timing, LOD state, sampling stats, and tracked GPU memory
+- `Help`: concept summary and demo-script export
+- `Log`: runtime and validation messages
 
-- **拖动**：旋转视角
-- **滚轮**：缩放视角
+## Example Scenes
 
-## 物理模型说明
+Quick buttons in the Inspector:
 
-### 玻尔模型
+- `H`
+- `He+`
+- `Ne Approx`
 
-玻尔模型是一种经典的原子模型，它假设电子在固定的圆形轨道上围绕原子核运动。本实现中，电子的轨道半径和速度根据玻尔理论计算得出。
+Scene definitions are stored in [assets/scenarios/demo_scenes.json](D:/project/dhyq/quantum-atom-simulation/assets/scenarios/demo_scenes.json).
 
-### 波粒二象性模型
+## Project Layout
 
-该模型展示了电子同时具有波动性和粒子性的特性。波函数通过正弦波模拟，粒子则通过点来表示。
+- `app/`: bootstrapping and orchestration
+- `core/`: logging, paths, frame stats
+- `physics/`: constants, transitions, configurations, shielding, clouds, solver
+- `render/`: camera, OpenGL objects, scene renderer
+- `ui/`: docking panels and plots
+- `docs/`: model notes, validation, performance guidance
+- `tests/`: physics verification target
+- `assets/data/`: element and reference-line data
 
-### 3D概率云模型
+## Validation
 
-该模型基于量子力学的波函数，通过粒子系统展示电子在原子核周围的概率分布。不同的量子数（n, l, m）对应不同的轨道形状。
+Current local verification:
 
-## 教育教学用途
+- application target builds successfully
+- test target passes
+- application binary starts successfully in a local smoke test
+- hydrogenic radial solver uses a finite-difference tridiagonal eigen solve
+- convergence samples are exposed in the GUI and tests
+- cloud generation tests cover fixed and adaptive sampling-stat paths
 
-该项目可以用于以下教育场景：
+See:
 
-1. **量子物理基础教学**：通过可视化展示帮助学生理解原子结构和量子力学基本概念
-2. **波粒二象性演示**：直观展示电子的双重性质
-3. **轨道形状学习**：通过3D可视化帮助学生理解不同类型轨道的形状
-4. **科学可视化实践**：作为计算机科学与物理学科交叉的实践项目
-
-## 技术实现
-
-- 使用C++11标准进行开发
-- 使用OpenGL进行3D渲染
-- 使用GLUT进行窗口管理和事件处理
-- 使用粒子系统实现概率云效果
-- 使用面向对象编程设计模式，确保代码结构清晰可维护
-
-## 扩展建议
-
-1. 添加更多量子模型，如薛定谔方程的数值解
-2. 增加原子光谱模拟功能
-3. 添加更多交互控制，如调整量子数
-4. 实现更复杂的分子模型
-5. 添加教育教学指南和解释文本
-
-## 许可证
-
-本项目采用MIT许可证，欢迎用于教育和研究目的。
+- [design.md](D:/project/dhyq/quantum-atom-simulation/design.md)
+- [docs/physics-model.md](D:/project/dhyq/quantum-atom-simulation/docs/physics-model.md)
+- [docs/validation.md](D:/project/dhyq/quantum-atom-simulation/docs/validation.md)
+- [docs/performance.md](D:/project/dhyq/quantum-atom-simulation/docs/performance.md)
