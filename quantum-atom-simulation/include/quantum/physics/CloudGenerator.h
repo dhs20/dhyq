@@ -24,6 +24,7 @@ struct CloudGenerationStats {
     int requestedPointCount = 0;
     int candidateCount = 0;
     int acceptedCount = 0;
+    int numericalComponentCount = 0;
     double candidateMultiplier = 0.0;
     int radialCdfSamples = 0;
     int angularScanResolution = 0;
@@ -32,6 +33,7 @@ struct CloudGenerationStats {
     double volumeBuildMs = 0.0;
     double normalizationEstimate = 1.0;
     double normalizationError = 0.0;
+    bool usedNumericalRadial = false;
 };
 
 struct CloudData {

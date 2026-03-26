@@ -5,6 +5,7 @@
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
 
+#include <chrono>
 #include <fstream>
 #include <sstream>
 
@@ -32,6 +33,43 @@ SamplingPresetValues samplingPresetValues(SamplingQualityPreset preset) {
     default:
         return {2.5, 4096, 48, 4096};
     }
+}
+
+quantum::physics::CloudRequest makeCloudRequest(const SimulationState& state,
+                                                const quantum::physics::ElementRecord& element,
+                                                const quantum::physics::NumericalSolverResult& solver) {
+    auto components = state.cloud.components;
+    if (components.empty()) {
+        components.push_back({state.solver.qn, 1.0, 0.0, state.derived.activeZeff});
+    }
+    for (auto& component : components) {
+        component.zeff = state.derived.activeZeff;
+    }
+
+    quantum::physics::NumericalRadialCache numericalCache;
+    if (state.cloud.useNumericalRadial && solver.converged && !components.empty()) {
+        numericalCache.valid = true;
+        numericalCache.qn = state.solver.qn;
+        numericalCache.zeff = state.derived.activeZeff;
+        numericalCache.radiiMeters = solver.radiiMeters;
+        numericalCache.radialValues = solver.radialFunction;
+    }
+
+    const auto samplingPreset = samplingPresetValues(state.cloud.samplingQuality);
+    return {state.atomicNumber,
+            quantum::physics::nuclearMassKg(element),
+            state.bohr.useReducedMass,
+            state.cloud.pointCount,
+            state.cloud.volumeResolution,
+            state.cloud.extentScale,
+            state.cloud.buildVolume,
+            state.cloud.adaptiveSampling,
+            samplingPreset.candidateMultiplier,
+            samplingPreset.radialCdfSamples,
+            samplingPreset.angularScanResolution,
+            samplingPreset.monteCarloSamples,
+            components,
+            numericalCache};
 }
 
 } // namespace
@@ -75,6 +113,7 @@ int Application::run() {
     while (!glfwWindowShouldClose(window_)) {
         performance_.beginFrame();
         glfwPollEvents();
+        pumpCloudBuild();
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -95,6 +134,7 @@ int Application::run() {
                                     renderStats.gpuVolumeMs,
                                     renderStats.renderedPointCount,
                                     renderStats.volumeSliceCount,
+                                    renderStats.volumeSliceAxis,
                                     renderStats.lodLevel,
                                     renderStats.cameraDistance,
                                     renderStats.pointBufferBytes,
@@ -170,6 +210,12 @@ bool Application::initializeImGui() {
 }
 
 void Application::shutdown() {
+    if (cloudBuildFuture_.valid()) {
+        cloudBuildFuture_.wait();
+    }
+    cloudBuildInFlight_ = false;
+    queuedCloudBuild_.reset();
+
     sceneRenderer_.shutdown();
 
     if (ImGui::GetCurrentContext() != nullptr) {
@@ -186,6 +232,7 @@ void Application::shutdown() {
 }
 
 void Application::recomputeDerived() {
+    pumpCloudBuild();
     if (!state_.dirty.physics && !state_.dirty.cloud && !state_.dirty.solver && !state_.dirty.reference) {
         return;
     }
@@ -265,7 +312,7 @@ void Application::recomputeDerived() {
                                                           state_.solver.convergencePasses,
                                                           state_.solver.maxScaledRadius});
         state_.derived.solver = solverResult;
-        if (solverResult.converged && state_.cloud.useNumericalRadial &&
+        if (solverResult.converged && state_.cloud.useNumericalRadial && !state_.cloud.components.empty() &&
             state_.solver.qn.n == state_.cloud.components.front().qn.n &&
             state_.solver.qn.l == state_.cloud.components.front().qn.l) {
             state_.derived.radialDistribution = solverResult.radialDistribution;
@@ -278,54 +325,83 @@ void Application::recomputeDerived() {
     }
 
     if (state_.dirty.cloud) {
-        auto components = state_.cloud.components;
-        if (components.empty()) {
-            components.push_back({state_.solver.qn, 1.0, 0.0, state_.derived.activeZeff});
-        }
-        for (auto& component : components) {
-            component.zeff = state_.derived.activeZeff;
-        }
-
-        quantum::physics::NumericalRadialCache numericalCache;
-        if (state_.cloud.useNumericalRadial && state_.derived.solver.converged && !components.empty() &&
-            components.front().qn.n == state_.solver.qn.n && components.front().qn.l == state_.solver.qn.l) {
-            numericalCache.valid = true;
-            numericalCache.qn = state_.solver.qn;
-            numericalCache.zeff = state_.derived.activeZeff;
-            numericalCache.radiiMeters = state_.derived.solver.radiiMeters;
-            numericalCache.radialValues = state_.derived.solver.radialFunction;
-        }
-
-        const auto samplingPreset = samplingPresetValues(state_.cloud.samplingQuality);
-
-        const auto cloud = cloudGenerator_.generate({state_.atomicNumber,
-                                                     nuclearMass,
-                                                     state_.bohr.useReducedMass,
-                                                     state_.cloud.pointCount,
-                                                     state_.cloud.volumeResolution,
-                                                     state_.cloud.extentScale,
-                                                     state_.cloud.buildVolume,
-                                                     state_.cloud.adaptiveSampling,
-                                                     samplingPreset.candidateMultiplier,
-                                                     samplingPreset.radialCdfSamples,
-                                                     samplingPreset.angularScanResolution,
-                                                     samplingPreset.monteCarloSamples,
-                                                     components,
-                                                     numericalCache});
-        state_.derived.cloud = cloud;
-        sceneRenderer_.uploadCloud(cloud);
-        performance_.setCloudBuildMs(cloud.stats.pointBuildMs);
-        performance_.setVolumeBuildMs(cloud.stats.volumeBuildMs);
-        performance_.setSamplingStats(cloud.stats.requestedPointCount,
-                                      cloud.stats.acceptedCount,
-                                      cloud.stats.candidateCount,
-                                      cloud.stats.candidateMultiplier,
-                                      cloud.stats.radialCdfSamples,
-                                      cloud.stats.angularScanResolution,
-                                      cloud.stats.monteCarloSamples);
+        startCloudBuild();
     }
 
     state_.dirty = {};
+}
+
+void Application::startCloudBuild() {
+    CloudBuildInput input;
+    input.request = makeCloudRequest(state_, state_.derived.element, state_.derived.solver);
+    input.generation = ++cloudBuildGeneration_;
+
+    if (cloudBuildInFlight_) {
+        queuedCloudBuild_ = std::move(input);
+        performance_.setCloudBuildState(true, true);
+        return;
+    }
+
+    auto request = input.request;
+    const auto generation = input.generation;
+    cloudBuildFuture_ = std::async(std::launch::async, [request = std::move(request), generation]() mutable {
+        quantum::physics::ProbabilityCloudGenerator generator;
+        CloudBuildOutput output;
+        output.generation = generation;
+        output.cloud = generator.generate(request);
+        return output;
+    });
+    cloudBuildInFlight_ = true;
+    performance_.setCloudBuildState(true, false);
+}
+
+void Application::pumpCloudBuild() {
+    if (!cloudBuildInFlight_ || !cloudBuildFuture_.valid()) {
+        performance_.setCloudBuildState(false, queuedCloudBuild_.has_value());
+        return;
+    }
+
+    if (cloudBuildFuture_.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+        performance_.setCloudBuildState(true, queuedCloudBuild_.has_value());
+        return;
+    }
+
+    auto result = cloudBuildFuture_.get();
+    cloudBuildInFlight_ = false;
+    performance_.setCloudBuildState(false, queuedCloudBuild_.has_value());
+
+    if (result.generation == cloudBuildGeneration_) {
+        applyCloudBuildResult(std::move(result));
+    }
+
+    if (queuedCloudBuild_.has_value()) {
+        const auto queuedGeneration = queuedCloudBuild_->generation;
+        auto request = queuedCloudBuild_->request;
+        queuedCloudBuild_.reset();
+        cloudBuildFuture_ = std::async(std::launch::async, [request = std::move(request), queuedGeneration]() mutable {
+            quantum::physics::ProbabilityCloudGenerator generator;
+            CloudBuildOutput output;
+            output.generation = queuedGeneration;
+            output.cloud = generator.generate(request);
+            return output;
+        });
+        cloudBuildInFlight_ = true;
+        performance_.setCloudBuildState(true, false);
+    }
+}
+
+void Application::applyCloudBuildResult(CloudBuildOutput&& result) {
+    state_.derived.cloud = std::move(result.cloud);
+    sceneRenderer_.uploadCloud(state_.derived.cloud);
+    performance_.setCloudBuildMs(state_.derived.cloud.stats.pointBuildMs);
+    performance_.setVolumeBuildMs(state_.derived.cloud.stats.volumeBuildMs);
+    performance_.setSamplingStats(state_.derived.cloud.stats.requestedPointCount,
+                                  state_.derived.cloud.stats.acceptedCount,
+                                  state_.derived.cloud.stats.candidateCount,
+                                  state_.derived.cloud.stats.candidateMultiplier,
+                                  state_.derived.cloud.stats.radialCdfSamples,
+                                  state_.derived.cloud.stats.angularScanResolution,
+                                  state_.derived.cloud.stats.monteCarloSamples);
 }
 
 void Application::loadReferenceLines() {

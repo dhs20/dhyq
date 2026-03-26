@@ -16,7 +16,10 @@
 #endif
 #include <GLFW/glfw3.h>
 
+#include <cstdint>
 #include <filesystem>
+#include <future>
+#include <optional>
 #include <string>
 
 namespace quantum::app {
@@ -30,10 +33,23 @@ public:
     int run();
 
 private:
+    struct CloudBuildInput {
+        quantum::physics::CloudRequest request;
+        std::uint64_t generation = 0;
+    };
+
+    struct CloudBuildOutput {
+        quantum::physics::CloudData cloud;
+        std::uint64_t generation = 0;
+    };
+
     bool initializeWindow();
     bool initializeImGui();
     void shutdown();
     void recomputeDerived();
+    void startCloudBuild();
+    void pumpCloudBuild();
+    void applyCloudBuildResult(CloudBuildOutput&& result);
     void loadReferenceLines();
     void processSceneCameraInput(const quantum::ui::UiFrameResult& uiFrame);
 
@@ -49,6 +65,10 @@ private:
     quantum::render::SceneRenderer sceneRenderer_;
     quantum::ui::AppUi appUi_;
     SimulationState state_;
+    std::future<CloudBuildOutput> cloudBuildFuture_;
+    std::optional<CloudBuildInput> queuedCloudBuild_;
+    std::uint64_t cloudBuildGeneration_ = 0;
+    bool cloudBuildInFlight_ = false;
 };
 
 } // namespace quantum::app

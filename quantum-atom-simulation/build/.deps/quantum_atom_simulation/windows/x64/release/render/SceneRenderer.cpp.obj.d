@@ -31,9 +31,6 @@
             "-DNDEBUG"
         }
     },
-    files = {
-        [[render\SceneRenderer.cpp]]
-    },
     depfiles = "{\
     \"Version\": \"1.2\",\
     \"Data\": {\
@@ -372,5 +369,8 @@
         \"ImportedHeaderUnits\": []\
     }\
 }",
+    files = {
+        [[render\SceneRenderer.cpp]]
+    },
     depfiles_format = "cl_json"
 }

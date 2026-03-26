@@ -49,12 +49,18 @@ void PerformanceTracker::setSamplingStats(int requestedPointCount,
     monteCarloSamples_ = monteCarloSamples;
 }
 
+void PerformanceTracker::setCloudBuildState(bool inFlight, bool queued) {
+    cloudBuildInFlight_ = inFlight;
+    cloudBuildQueued_ = queued;
+}
+
 void PerformanceTracker::setRenderStats(bool gpuTimersSupported,
                                         double gpuFrameMs,
                                         double gpuPointMs,
                                         double gpuVolumeMs,
                                         int renderedPointCount,
                                         int volumeSliceCount,
+                                        int volumeSliceAxis,
                                         int lodLevel,
                                         double cameraDistance,
                                         std::size_t pointBufferBytes,
@@ -66,6 +72,7 @@ void PerformanceTracker::setRenderStats(bool gpuTimersSupported,
     gpuVolumeMs_ = gpuVolumeMs;
     renderedPointCount_ = renderedPointCount;
     volumeSliceCount_ = volumeSliceCount;
+    volumeSliceAxis_ = volumeSliceAxis;
     lodLevel_ = lodLevel;
     cameraDistance_ = cameraDistance;
     pointBufferBytes_ = pointBufferBytes;
@@ -82,11 +89,14 @@ PerformanceSnapshot PerformanceTracker::snapshot() const {
     snapshot.gpuPointMs = gpuPointMs_;
     snapshot.gpuVolumeMs = gpuVolumeMs_;
     snapshot.gpuTimersSupported = gpuTimersSupported_;
+    snapshot.cloudBuildInFlight = cloudBuildInFlight_;
+    snapshot.cloudBuildQueued = cloudBuildQueued_;
     snapshot.requestedPointCount = requestedPointCount_;
     snapshot.pointCount = pointCount_;
     snapshot.candidateCount = candidateCount_;
     snapshot.renderedPointCount = renderedPointCount_;
     snapshot.volumeSliceCount = volumeSliceCount_;
+    snapshot.volumeSliceAxis = volumeSliceAxis_;
     snapshot.lodLevel = lodLevel_;
     snapshot.cameraDistance = cameraDistance_;
     snapshot.candidateMultiplier = candidateMultiplier_;

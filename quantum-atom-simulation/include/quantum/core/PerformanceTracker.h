@@ -15,11 +15,14 @@ struct PerformanceSnapshot {
     double gpuPointMs = 0.0;
     double gpuVolumeMs = 0.0;
     bool gpuTimersSupported = false;
+    bool cloudBuildInFlight = false;
+    bool cloudBuildQueued = false;
     int requestedPointCount = 0;
     int pointCount = 0;
     int candidateCount = 0;
     int renderedPointCount = 0;
     int volumeSliceCount = 0;
+    int volumeSliceAxis = 2;
     int lodLevel = 0;
     double cameraDistance = 0.0;
     double candidateMultiplier = 0.0;
@@ -45,12 +48,14 @@ public:
                           int radialCdfSamples,
                           int angularScanResolution,
                           int monteCarloSamples);
+    void setCloudBuildState(bool inFlight, bool queued);
     void setRenderStats(bool gpuTimersSupported,
                         double gpuFrameMs,
                         double gpuPointMs,
                         double gpuVolumeMs,
                         int renderedPointCount,
                         int volumeSliceCount,
+                        int volumeSliceAxis,
                         int lodLevel,
                         double cameraDistance,
                         std::size_t pointBufferBytes,
@@ -68,11 +73,14 @@ private:
     double gpuPointMs_ = 0.0;
     double gpuVolumeMs_ = 0.0;
     bool gpuTimersSupported_ = false;
+    bool cloudBuildInFlight_ = false;
+    bool cloudBuildQueued_ = false;
     int requestedPointCount_ = 0;
     int pointCount_ = 0;
     int candidateCount_ = 0;
     int renderedPointCount_ = 0;
     int volumeSliceCount_ = 0;
+    int volumeSliceAxis_ = 2;
     int lodLevel_ = 0;
     double cameraDistance_ = 0.0;
     double candidateMultiplier_ = 0.0;

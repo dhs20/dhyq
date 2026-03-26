@@ -2,7 +2,6 @@
     files = {
         [[physics\AtomicPhysics.cpp]]
     },
-    depfiles_format = "cl_json",
     depfiles = "{\
     \"Version\": \"1.2\",\
     \"Data\": {\
@@ -180,5 +179,6 @@
             "/utf-8",
             "-DNDEBUG"
         }
-    }
+    },
+    depfiles_format = "cl_json"
 }

@@ -25,6 +25,7 @@ struct SceneRenderStats {
     int totalPointCount = 0;
     int renderedPointCount = 0;
     int volumeSliceCount = 0;
+    int volumeSliceAxis = 2;
     int lodLevel = 0;
     bool interactionLod = false;
     float cameraDistance = 0.0f;
@@ -52,6 +53,11 @@ private:
         float cameraDistance = 0.0f;
     };
 
+    struct VolumeSlicePlan {
+        int axis = 2;
+        bool reverse = false;
+    };
+
     struct TimerQuerySet {
         GLuint frameStart = 0;
         GLuint frameEnd = 0;
@@ -69,6 +75,7 @@ private:
     void destroyGpuTimers();
     void resolveGpuTimers();
     [[nodiscard]] LODDecision decideLod(const quantum::app::SimulationState& state, const OrbitCamera& camera) const;
+    [[nodiscard]] VolumeSlicePlan chooseVolumeSlicePlan(const OrbitCamera& camera) const;
     void renderGrid(const glm::mat4& view, const glm::mat4& projection);
     void renderNucleus(const glm::mat4& view, const glm::mat4& projection);
     void renderOrbits(const quantum::app::SimulationState& state, const glm::mat4& view, const glm::mat4& projection);
@@ -79,7 +86,8 @@ private:
     void renderVolume(const quantum::app::SimulationState& state,
                       const glm::mat4& view,
                       const glm::mat4& projection,
-                      int sliceCount);
+                      int sliceCount,
+                      const VolumeSlicePlan& slicePlan);
 
     Framebuffer framebuffer_;
     ShaderProgram meshShader_;

@@ -115,6 +115,39 @@ int main() {
     expectTrue("Adaptive angular scan increases", adaptiveSamplingCloud.stats.angularScanResolution >= 48);
     expectTrue("Adaptive monte carlo increases", adaptiveSamplingCloud.stats.monteCarloSamples > 4096);
 
+    const auto analyticCloud = cloudGenerator.generate(
+        {1, hydrogenMass, true, 512, 0, 10.0, false, false, 2.0, 1024, 24, 1024, {{{1, 0, 0}, 1.0, 0.0, 1.0}}, {}});
+    NumericalRadialCache syntheticCache;
+    syntheticCache.valid = true;
+    syntheticCache.qn = {1, 0, 0};
+    syntheticCache.zeff = 1.0;
+    syntheticCache.radiiMeters = {0.0, 2.0 * constants::bohrRadiusM, 4.0 * constants::bohrRadiusM, 8.0 * constants::bohrRadiusM};
+    syntheticCache.radialValues = {0.0, 0.0, 1.0e5, 0.0};
+    const auto numericalCloud = cloudGenerator.generate({1,
+                                                         hydrogenMass,
+                                                         true,
+                                                         512,
+                                                         0,
+                                                         10.0,
+                                                         false,
+                                                         false,
+                                                         2.0,
+                                                         1024,
+                                                         24,
+                                                         1024,
+                                                         {{{1, 0, 0}, 1.0, 0.0, 1.0}},
+                                                         syntheticCache});
+    expectTrue("Numerical radial flag propagated", numericalCloud.stats.usedNumericalRadial);
+    expectTrue("Numerical radial component count", numericalCloud.stats.numericalComponentCount == 1);
+    const auto analyticRadius = std::sqrt(static_cast<double>(analyticCloud.points.front().x) * analyticCloud.points.front().x +
+                                          static_cast<double>(analyticCloud.points.front().y) * analyticCloud.points.front().y +
+                                          static_cast<double>(analyticCloud.points.front().z) * analyticCloud.points.front().z);
+    const auto numericalRadius = std::sqrt(static_cast<double>(numericalCloud.points.front().x) * numericalCloud.points.front().x +
+                                           static_cast<double>(numericalCloud.points.front().y) * numericalCloud.points.front().y +
+                                           static_cast<double>(numericalCloud.points.front().z) * numericalCloud.points.front().z);
+    expectTrue("Numerical radial changes sampled cloud",
+               std::abs(numericalRadius - analyticRadius) > 0.5 * constants::bohrRadiusM);
+
     SchrodingerNumericalSolver solver;
     const auto numerical = solver.solve({1, 1.0, hydrogenMass, true, {1, 0, 0}, 4096, 4, 120.0});
     expectTrue("Numerical solver converged", numerical.converged);

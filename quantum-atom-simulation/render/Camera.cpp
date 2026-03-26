@@ -46,6 +46,10 @@ glm::vec3 OrbitCamera::position() const {
     return target_ + glm::vec3(distance_ * cp * cy, distance_ * sp, distance_ * cp * sy);
 }
 
+glm::vec3 OrbitCamera::offsetFromTarget() const {
+    return position() - target_;
+}
+
 float OrbitCamera::aspectRatio() const {
     return static_cast<float>(width_) / static_cast<float>(height_);
 }

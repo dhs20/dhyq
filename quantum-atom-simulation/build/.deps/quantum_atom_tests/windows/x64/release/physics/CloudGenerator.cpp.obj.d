@@ -17,6 +17,9 @@
             "-DNDEBUG"
         }
     },
+    files = {
+        [[physics\CloudGenerator.cpp]]
+    },
     depfiles = "{\
     \"Version\": \"1.2\",\
     \"Data\": {\
@@ -188,8 +191,5 @@
         \"ImportedModules\": [],\
         \"ImportedHeaderUnits\": []\
     }\
-}",
-    files = {
-        [[physics\CloudGenerator.cpp]]
-    }
+}"
 }

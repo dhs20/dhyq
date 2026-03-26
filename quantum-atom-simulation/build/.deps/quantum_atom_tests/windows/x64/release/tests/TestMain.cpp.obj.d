@@ -17,6 +17,9 @@
             "-DNDEBUG"
         }
     },
+    files = {
+        [[tests\TestMain.cpp]]
+    },
     depfiles = "{\
     \"Version\": \"1.2\",\
     \"Data\": {\
@@ -194,8 +197,5 @@
         \"ImportedModules\": [],\
         \"ImportedHeaderUnits\": []\
     }\
-}",
-    files = {
-        [[tests\TestMain.cpp]]
-    }
+}"
 }

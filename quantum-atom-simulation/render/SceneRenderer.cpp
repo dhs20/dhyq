@@ -104,11 +104,20 @@ uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
 uniform float uSlice;
+uniform int uSliceAxis;
 
 out vec3 vTexCoord;
 
 void main() {
-    vec3 position = vec3(aPosition.xy, mix(-1.0, 1.0, uSlice));
+    float slicePosition = mix(-1.0, 1.0, uSlice);
+    vec3 position;
+    if (uSliceAxis == 0) {
+        position = vec3(slicePosition, aPosition.x, aPosition.y);
+    } else if (uSliceAxis == 1) {
+        position = vec3(aPosition.x, slicePosition, aPosition.y);
+    } else {
+        position = vec3(aPosition.xy, slicePosition);
+    }
     vTexCoord = position * 0.5 + 0.5;
     gl_Position = uProjection * uView * uModel * vec4(position, 1.0);
 }
@@ -316,6 +325,7 @@ SceneRenderStats SceneRenderer::render(const quantum::app::SimulationState& stat
     timerSet.volumeIssued = false;
 
     const LODDecision lod = decideLod(state, camera);
+    const VolumeSlicePlan slicePlan = chooseVolumeSlicePlan(camera);
     framebuffer_.bind();
     glViewport(0, 0, framebuffer_.width(), framebuffer_.height());
     glClearColor(0.04f, 0.06f, 0.09f, 1.0f);
@@ -355,7 +365,7 @@ SceneRenderStats SceneRenderer::render(const quantum::app::SimulationState& stat
         if (gpuTimersSupported_) {
             glQueryCounter(timerSet.volumeStart, GL_TIMESTAMP);
         }
-        renderVolume(state, view, projection, lod.volumeSliceCount);
+        renderVolume(state, view, projection, lod.volumeSliceCount, slicePlan);
         if (gpuTimersSupported_) {
             glQueryCounter(timerSet.volumeEnd, GL_TIMESTAMP);
             timerSet.volumeIssued = true;
@@ -383,6 +393,7 @@ SceneRenderStats SceneRenderer::render(const quantum::app::SimulationState& stat
     stats.totalPointCount = static_cast<int>(pointCount_);
     stats.renderedPointCount = pointPassEnabled ? lod.renderedPointCount : 0;
     stats.volumeSliceCount = volumePassEnabled ? lod.volumeSliceCount : 0;
+    stats.volumeSliceAxis = slicePlan.axis;
     stats.lodLevel = lod.level;
     stats.interactionLod = lod.interactionLod;
     stats.cameraDistance = lod.cameraDistance;
@@ -543,6 +554,23 @@ SceneRenderer::LODDecision SceneRenderer::decideLod(const quantum::app::Simulati
     return decision;
 }
 
+SceneRenderer::VolumeSlicePlan SceneRenderer::chooseVolumeSlicePlan(const OrbitCamera& camera) const {
+    VolumeSlicePlan plan;
+    const glm::vec3 offset = camera.offsetFromTarget();
+    const glm::vec3 absolute = glm::abs(offset);
+    if (absolute.x >= absolute.y && absolute.x >= absolute.z) {
+        plan.axis = 0;
+        plan.reverse = offset.x < 0.0f;
+    } else if (absolute.y >= absolute.z) {
+        plan.axis = 1;
+        plan.reverse = offset.y < 0.0f;
+    } else {
+        plan.axis = 2;
+        plan.reverse = offset.z < 0.0f;
+    }
+    return plan;
+}
+
 void SceneRenderer::renderGrid(const glm::mat4& view, const glm::mat4& projection) {
     meshShader_.use();
     const glm::mat4 model(1.0f);
@@ -605,7 +633,8 @@ void SceneRenderer::renderPointCloud(const quantum::app::SimulationState& state,
 void SceneRenderer::renderVolume(const quantum::app::SimulationState& state,
                                  const glm::mat4& view,
                                  const glm::mat4& projection,
-                                 int sliceCount) {
+                                 int sliceCount,
+                                 const VolumeSlicePlan& slicePlan) {
     if (volumeTexture_.id() == 0 || volumeExtent_ <= 0.0f || sliceCount <= 0) {
         return;
     }
@@ -616,11 +645,13 @@ void SceneRenderer::renderVolume(const quantum::app::SimulationState& state,
     glUniformMatrix4fv(glGetUniformLocation(volumeShader_.id(), "uProjection"), 1, GL_FALSE, glm::value_ptr(projection));
     glUniform1f(glGetUniformLocation(volumeShader_.id(), "uExposure"), state.view.exposure);
     glUniform1i(glGetUniformLocation(volumeShader_.id(), "uVolumeTexture"), 0);
+    glUniform1i(glGetUniformLocation(volumeShader_.id(), "uSliceAxis"), slicePlan.axis);
     volumeTexture_.bind(GL_TEXTURE0);
 
     glDepthMask(GL_FALSE);
     for (int slice = 0; slice < sliceCount; ++slice) {
-        glUniform1f(glGetUniformLocation(volumeShader_.id(), "uSlice"), static_cast<float>(slice) /
+        const int sliceIndex = slicePlan.reverse ? (sliceCount - 1 - slice) : slice;
+        glUniform1f(glGetUniformLocation(volumeShader_.id(), "uSlice"), static_cast<float>(sliceIndex) /
                                                                     static_cast<float>(std::max(1, sliceCount - 1)));
         quadMesh_.draw();
     }

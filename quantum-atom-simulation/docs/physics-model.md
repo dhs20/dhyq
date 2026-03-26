@@ -78,6 +78,7 @@ Point generation uses:
 - precomputed radial CDFs
 - angular rejection sampling
 - cached candidate filtering for 1e5-point clouds
+- optional numerical-radial interpolation from the finite-difference solver when the selected `(n, l)` matches the cached solver state
 
 ## Numerical Solver
 

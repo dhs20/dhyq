@@ -1,5 +1,4 @@
 {
-    depfiles_format = "cl_json",
     values = {
         [[D:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\cl.exe]],
         {
@@ -279,5 +278,6 @@
 }",
     files = {
         [[render\Camera.cpp]]
-    }
+    },
+    depfiles_format = "cl_json"
 }

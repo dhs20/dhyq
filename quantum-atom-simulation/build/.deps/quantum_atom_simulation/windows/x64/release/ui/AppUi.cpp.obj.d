@@ -1,4 +1,36 @@
 {
+    values = {
+        [[D:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\cl.exe]],
+        {
+            "-nologo",
+            "-MD",
+            "-O2",
+            "-std:c++20",
+            "-Iinclude",
+            "-DGLEW_NO_GLU",
+            "-DGLEW_STATIC",
+            "-DGLFW_INCLUDE_NONE",
+            "/EHsc",
+            "-external:W0",
+            [[-external:ID:\project\dhyq\.xmake-pkg-install\g\glew\2.2.0\b624c40e764e48a2989368361626750b\include]],
+            "-external:W0",
+            [[-external:ID:\project\dhyq\.xmake-pkg-install\g\glm\1.0.1\18615f0387cd4e2ab2e9ea9965afc784\include]],
+            "-external:W0",
+            [[-external:ID:\project\dhyq\.xmake-pkg-install\n\nlohmann_json\v3.11.3\826582eb66794908a16a49dbdd33bec4\include]],
+            "-external:W0",
+            [[-external:ID:\project\dhyq\.xmake-pkg-install\i\imgui\v1.92.6-docking\deffc05e62384fc79b7c0bf916fa03d3\include]],
+            "-external:W0",
+            [[-external:ID:\project\dhyq\.xmake-pkg-install\i\imgui\v1.92.6-docking\deffc05e62384fc79b7c0bf916fa03d3\include\imgui]],
+            "-external:W0",
+            [[-external:ID:\project\dhyq\.xmake-pkg-install\i\imgui\v1.92.6-docking\deffc05e62384fc79b7c0bf916fa03d3\include\backends]],
+            "-external:W0",
+            [[-external:ID:\project\dhyq\.xmake-pkg-install\i\imgui\v1.92.6-docking\deffc05e62384fc79b7c0bf916fa03d3\include\misc\cpp]],
+            "-external:W0",
+            [[-external:ID:\project\dhyq\.xmake-pkg-install\g\glfw\3.4\d59f6dd71e7647cc95d2c1d35e51a39a\include]],
+            "/utf-8",
+            "-DNDEBUG"
+        }
+    },
     depfiles = "{\
     \"Version\": \"1.2\",\
     \"Data\": {\
@@ -233,40 +265,8 @@
         \"ImportedHeaderUnits\": []\
     }\
 }",
-    values = {
-        [[D:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\cl.exe]],
-        {
-            "-nologo",
-            "-MD",
-            "-O2",
-            "-std:c++20",
-            "-Iinclude",
-            "-DGLEW_NO_GLU",
-            "-DGLEW_STATIC",
-            "-DGLFW_INCLUDE_NONE",
-            "/EHsc",
-            "-external:W0",
-            [[-external:ID:\project\dhyq\.xmake-pkg-install\g\glew\2.2.0\b624c40e764e48a2989368361626750b\include]],
-            "-external:W0",
-            [[-external:ID:\project\dhyq\.xmake-pkg-install\g\glm\1.0.1\18615f0387cd4e2ab2e9ea9965afc784\include]],
-            "-external:W0",
-            [[-external:ID:\project\dhyq\.xmake-pkg-install\n\nlohmann_json\v3.11.3\826582eb66794908a16a49dbdd33bec4\include]],
-            "-external:W0",
-            [[-external:ID:\project\dhyq\.xmake-pkg-install\i\imgui\v1.92.6-docking\deffc05e62384fc79b7c0bf916fa03d3\include]],
-            "-external:W0",
-            [[-external:ID:\project\dhyq\.xmake-pkg-install\i\imgui\v1.92.6-docking\deffc05e62384fc79b7c0bf916fa03d3\include\imgui]],
-            "-external:W0",
-            [[-external:ID:\project\dhyq\.xmake-pkg-install\i\imgui\v1.92.6-docking\deffc05e62384fc79b7c0bf916fa03d3\include\backends]],
-            "-external:W0",
-            [[-external:ID:\project\dhyq\.xmake-pkg-install\i\imgui\v1.92.6-docking\deffc05e62384fc79b7c0bf916fa03d3\include\misc\cpp]],
-            "-external:W0",
-            [[-external:ID:\project\dhyq\.xmake-pkg-install\g\glfw\3.4\d59f6dd71e7647cc95d2c1d35e51a39a\include]],
-            "/utf-8",
-            "-DNDEBUG"
-        }
-    },
-    depfiles_format = "cl_json",
     files = {
         [[ui\AppUi.cpp]]
-    }
+    },
+    depfiles_format = "cl_json"
 }

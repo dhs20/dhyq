@@ -26,18 +26,89 @@ double nowMs() {
     return std::chrono::duration<double, std::milli>(now).count();
 }
 
+bool matchesNumericalRadial(const NumericalRadialCache& cache, const SuperpositionComponent& component) {
+    return cache.valid && cache.qn.n == component.qn.n && cache.qn.l == component.qn.l &&
+           std::abs(cache.zeff - component.zeff) <= 1.0e-6;
+}
+
+double interpolateNumericalRadial(const NumericalRadialCache& cache, double radiusM) {
+    if (!cache.valid || cache.radiiMeters.empty() || cache.radialValues.empty()) {
+        return 0.0;
+    }
+    if (radiusM <= cache.radiiMeters.front()) {
+        return cache.radialValues.front();
+    }
+    if (radiusM >= cache.radiiMeters.back()) {
+        return 0.0;
+    }
+
+    const auto upper = std::lower_bound(cache.radiiMeters.begin(), cache.radiiMeters.end(), radiusM);
+    if (upper == cache.radiiMeters.begin()) {
+        return cache.radialValues.front();
+    }
+    const std::size_t index = static_cast<std::size_t>(std::distance(cache.radiiMeters.begin(), upper));
+    const double r0 = cache.radiiMeters[index - 1];
+    const double r1 = cache.radiiMeters[index];
+    const double alpha = (radiusM - r0) / std::max(1.0e-20, r1 - r0);
+    return cache.radialValues[index - 1] + alpha * (cache.radialValues[index] - cache.radialValues[index - 1]);
+}
+
+double componentRadialProbabilityDensity(int nuclearCharge,
+                                         const SuperpositionComponent& component,
+                                         double nuclearMassKg,
+                                         double radiusM,
+                                         const NumericalRadialCache& cache) {
+    if (matchesNumericalRadial(cache, component)) {
+        const double radial = interpolateNumericalRadial(cache, radiusM);
+        return radiusM * radiusM * radial * radial;
+    }
+    return radialProbabilityDensity(nuclearCharge, component.qn, component.zeff, nuclearMassKg, radiusM);
+}
+
+std::complex<double> componentWavefunction(int nuclearCharge,
+                                           const SuperpositionComponent& component,
+                                           double nuclearMassKg,
+                                           double radiusM,
+                                           double theta,
+                                           double phi,
+                                           const NumericalRadialCache& cache) {
+    if (matchesNumericalRadial(cache, component)) {
+        return interpolateNumericalRadial(cache, radiusM) * sphericalHarmonicValue(component.qn, theta, phi);
+    }
+    return hydrogenicWavefunction(nuclearCharge, component.qn, component.zeff, nuclearMassKg, radiusM, theta, phi);
+}
+
+ComplexWaveSample evaluateSuperpositionAt(int nuclearCharge,
+                                          const std::vector<SuperpositionComponent>& components,
+                                          double nuclearMassKg,
+                                          double radiusM,
+                                          double theta,
+                                          double phi,
+                                          const NumericalRadialCache& cache) {
+    ComplexWaveSample sample;
+    for (const auto& component : components) {
+        const auto coefficient = std::polar(component.amplitude, component.phaseRadians);
+        sample.psi += coefficient *
+                      componentWavefunction(nuclearCharge, component, nuclearMassKg, radiusM, theta, phi, cache);
+    }
+    sample.density = std::norm(sample.psi);
+    sample.phaseRadians = std::arg(sample.psi);
+    return sample;
+}
+
 std::vector<double> buildRadialCdf(int nuclearCharge,
                                    const SuperpositionComponent& component,
                                    double nuclearMassKg,
                                    double maxRadiusM,
-                                   int sampleCount) {
+                                   int sampleCount,
+                                   const NumericalRadialCache& cache) {
     std::vector<double> cdf(static_cast<std::size_t>(sampleCount), 0.0);
     double accumulator = 0.0;
     double previousDensity = 0.0;
     const double dr = maxRadiusM / static_cast<double>(sampleCount - 1);
     for (int index = 0; index < sampleCount; ++index) {
         const double radius = dr * static_cast<double>(index);
-        const double density = radialProbabilityDensity(nuclearCharge, component.qn, component.zeff, nuclearMassKg, radius);
+        const double density = componentRadialProbabilityDensity(nuclearCharge, component, nuclearMassKg, radius, cache);
         if (index > 0) {
             accumulator += 0.5 * (density + previousDensity) * dr;
         }
@@ -72,6 +143,7 @@ std::array<double, 2> sampleAngles(int nuclearCharge,
                                    const SuperpositionComponent& component,
                                    double nuclearMassKg,
                                    int scanResolution,
+                                   const NumericalRadialCache& cache,
                                    std::mt19937_64& rng) {
     std::uniform_real_distribution<double> uniform01(0.0, 1.0);
     std::uniform_real_distribution<double> uniformPhi(0.0, 2.0 * constants::pi);
@@ -82,8 +154,8 @@ std::array<double, 2> sampleAngles(int nuclearCharge,
         const double theta = constants::pi * static_cast<double>(i) / static_cast<double>(resolution - 1);
         for (int j = 0; j < resolution; ++j) {
             const double phi = 2.0 * constants::pi * static_cast<double>(j) / static_cast<double>(resolution - 1);
-            const auto psi = hydrogenicWavefunction(
-                nuclearCharge, component.qn, component.zeff, nuclearMassKg, constants::bohrRadiusM, theta, phi);
+            const auto psi = componentWavefunction(
+                nuclearCharge, component, nuclearMassKg, constants::bohrRadiusM, theta, phi, cache);
             peakDensity = std::max(peakDensity, std::norm(psi));
         }
     }
@@ -92,8 +164,8 @@ std::array<double, 2> sampleAngles(int nuclearCharge,
         const double cosTheta = 2.0 * uniform01(rng) - 1.0;
         const double theta = std::acos(std::clamp(cosTheta, -1.0, 1.0));
         const double phi = uniformPhi(rng);
-        const auto psi = hydrogenicWavefunction(
-            nuclearCharge, component.qn, component.zeff, nuclearMassKg, constants::bohrRadiusM, theta, phi);
+        const auto psi = componentWavefunction(
+            nuclearCharge, component, nuclearMassKg, constants::bohrRadiusM, theta, phi, cache);
         if (uniform01(rng) <= std::norm(psi) / peakDensity) {
             return {theta, phi};
         }
@@ -143,6 +215,12 @@ CloudData ProbabilityCloudGenerator::generate(const CloudRequest& request) const
     CloudData cloud;
     cloud.normalizedComponents = normalizedComponents(request.components);
     cloud.stats.requestedPointCount = request.pointCount;
+    for (const auto& component : cloud.normalizedComponents) {
+        if (matchesNumericalRadial(request.numericalRadial, component)) {
+            ++cloud.stats.numericalComponentCount;
+        }
+    }
+    cloud.stats.usedNumericalRadial = cloud.stats.numericalComponentCount > 0;
     const AdaptiveSamplingSettings sampling = deriveSamplingSettings(request, cloud.normalizedComponents.size());
     cloud.stats.candidateMultiplier = sampling.candidateMultiplier;
     cloud.stats.radialCdfSamples = sampling.radialCdfSamples;
@@ -166,7 +244,8 @@ CloudData ProbabilityCloudGenerator::generate(const CloudRequest& request) const
                                      component,
                                      request.nuclearMassKg,
                                      cloud.extentMeters,
-                                     sampling.radialCdfSamples));
+                                     sampling.radialCdfSamples,
+                                     request.numericalRadial));
     }
 
     std::vector<double> weights;
@@ -190,7 +269,12 @@ CloudData ProbabilityCloudGenerator::generate(const CloudRequest& request) const
         const auto& component = cloud.normalizedComponents[componentIndex];
         const double radius = sampleRadius(cdfs[componentIndex], cloud.extentMeters, uniform01(rng));
         const auto angles =
-            sampleAngles(request.nuclearCharge, component, request.nuclearMassKg, sampling.angularScanResolution, rng);
+            sampleAngles(request.nuclearCharge,
+                         component,
+                         request.nuclearMassKg,
+                         sampling.angularScanResolution,
+                         request.numericalRadial,
+                         rng);
         const double theta = angles[0];
         const double phi = angles[1];
         const double sinTheta = std::sin(theta);
@@ -198,8 +282,13 @@ CloudData ProbabilityCloudGenerator::generate(const CloudRequest& request) const
         const double x = radius * sinTheta * std::cos(phi);
         const double y = radius * sinTheta * std::sin(phi);
         const double z = radius * std::cos(theta);
-        const auto sample = evaluateSuperposition(
-            request.nuclearCharge, cloud.normalizedComponents, request.nuclearMassKg, radius, theta, phi);
+        const auto sample = evaluateSuperpositionAt(request.nuclearCharge,
+                                                    cloud.normalizedComponents,
+                                                    request.nuclearMassKg,
+                                                    radius,
+                                                    theta,
+                                                    phi,
+                                                    request.numericalRadial);
 
         candidates.push_back({CloudPoint{static_cast<float>(x),
                                          static_cast<float>(y),
@@ -235,8 +324,13 @@ CloudData ProbabilityCloudGenerator::generate(const CloudRequest& request) const
         const double cosTheta = 2.0 * uniform01(rng) - 1.0;
         const double theta = std::acos(std::clamp(cosTheta, -1.0, 1.0));
         const double phi = 2.0 * constants::pi * uniform01(rng);
-        const auto sample = evaluateSuperposition(
-            request.nuclearCharge, cloud.normalizedComponents, request.nuclearMassKg, radius, theta, phi);
+        const auto sample = evaluateSuperpositionAt(request.nuclearCharge,
+                                                    cloud.normalizedComponents,
+                                                    request.nuclearMassKg,
+                                                    radius,
+                                                    theta,
+                                                    phi,
+                                                    request.numericalRadial);
         monteCarloEstimate += sample.density * radius * radius * std::sin(theta);
     }
     monteCarloEstimate *= 4.0 * constants::pi * cloud.extentMeters / static_cast<double>(integrationSamples);
@@ -266,8 +360,13 @@ CloudData ProbabilityCloudGenerator::generate(const CloudRequest& request) const
                     }
                     const double theta = (radius > 1e-20) ? std::acos(std::clamp(pz / radius, -1.0, 1.0)) : 0.0;
                     const double phi = std::atan2(py, px);
-                    const auto sample = evaluateSuperposition(
-                        request.nuclearCharge, cloud.normalizedComponents, request.nuclearMassKg, radius, theta, phi);
+                    const auto sample = evaluateSuperpositionAt(request.nuclearCharge,
+                                                                cloud.normalizedComponents,
+                                                                request.nuclearMassKg,
+                                                                radius,
+                                                                theta,
+                                                                phi,
+                                                                request.numericalRadial);
                     const std::size_t baseIndex =
                         (static_cast<std::size_t>(z) * request.volumeResolution * request.volumeResolution +
                          static_cast<std::size_t>(y) * request.volumeResolution + static_cast<std::size_t>(x)) *

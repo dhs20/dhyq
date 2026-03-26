@@ -236,6 +236,7 @@
         \"ImportedHeaderUnits\": []\
     }\
 }",
+    depfiles_format = "cl_json",
     files = {
         [[physics\ElementDatabase.cpp]]
     },
@@ -255,6 +256,5 @@
             "/utf-8",
             "-DNDEBUG"
         }
-    },
-    depfiles_format = "cl_json"
+    }
 }

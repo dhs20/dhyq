@@ -24,6 +24,9 @@ public:
                        const quantum::core::Logger& logger,
                        GLuint sceneTexture,
                        const glm::ivec2& framebufferSize) const;
+
+private:
+    mutable bool layoutInitialized_ = false;
 };
 
 } // namespace quantum::ui

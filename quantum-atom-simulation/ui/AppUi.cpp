@@ -81,6 +81,19 @@ const char* lodLabel(int lodLevel) {
     }
 }
 
+const char* sliceAxisLabel(int axis) {
+    switch (axis) {
+    case 0:
+        return "X";
+    case 1:
+        return "Y";
+    case 2:
+        return "Z";
+    default:
+        return "?";
+    }
+}
+
 std::string formatBytes(std::size_t bytes) {
     constexpr double kKilobyte = 1024.0;
     constexpr double kMegabyte = 1024.0 * 1024.0;
@@ -96,6 +109,49 @@ std::string formatBytes(std::size_t bytes) {
         return stream.str();
     }
     return std::to_string(bytes) + " B";
+}
+
+void ensureDefaultDockLayout(ImGuiID dockspaceId, bool& layoutInitialized) {
+    if (layoutInitialized && ImGui::DockBuilderGetNode(dockspaceId) != nullptr) {
+        return;
+    }
+
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::DockBuilderRemoveNode(dockspaceId);
+    ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+    ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
+
+    ImGuiID dockMain = dockspaceId;
+    ImGuiID dockLeft = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, 0.23f, nullptr, &dockMain);
+    ImGuiID dockRight = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.24f, nullptr, &dockMain);
+    ImGuiID dockBottom = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.34f, nullptr, &dockMain);
+    ImGuiID dockRightBottom = ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.43f, nullptr, &dockRight);
+    ImGuiID dockRightTabs = ImGui::DockBuilderSplitNode(dockRightBottom, ImGuiDir_Down, 0.52f, nullptr, &dockRightBottom);
+
+    ImGui::DockBuilderDockWindow("Scene", dockMain);
+    ImGui::DockBuilderDockWindow("Inspector", dockLeft);
+    ImGui::DockBuilderDockWindow("Physics", dockRight);
+    ImGui::DockBuilderDockWindow("Plots", dockBottom);
+    ImGui::DockBuilderDockWindow("Performance", dockRightBottom);
+    ImGui::DockBuilderDockWindow("Help", dockRightTabs);
+    ImGui::DockBuilderDockWindow("Log", dockRightTabs);
+    ImGui::DockBuilderFinish(dockspaceId);
+    layoutInitialized = true;
+}
+
+ImVec2 fitRectPreservingAspect(const ImVec2& available, float aspectRatio) {
+    ImVec2 size(std::max(available.x, 1.0f), std::max(available.y, 1.0f));
+    if (aspectRatio <= 1.0e-6f) {
+        return size;
+    }
+
+    const float availableAspect = size.x / std::max(size.y, 1.0f);
+    if (availableAspect > aspectRatio) {
+        size.x = size.y * aspectRatio;
+    } else {
+        size.y = size.x / aspectRatio;
+    }
+    return size;
 }
 
 void markAllDirty(quantum::app::SimulationState& state) {
@@ -131,16 +187,6 @@ void drawScenarioButtons(quantum::app::SimulationState& state) {
         state.solver.qn = {2, 1, 0};
         markAllDirty(state);
     }
-}
-
-template <typename Getter>
-std::vector<double> collectSeries(const std::vector<std::pair<double, double>>& data, Getter getter) {
-    std::vector<double> values;
-    values.reserve(data.size());
-    for (const auto& item : data) {
-        values.push_back(getter(item));
-    }
-    return values;
 }
 
 ImRect beginPlotCanvas(const char* label, float height) {
@@ -257,23 +303,51 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
     UiFrameResult result;
     result.sceneSize = glm::vec2(static_cast<float>(framebufferSize.x), static_cast<float>(framebufferSize.y));
 
-    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+    const ImGuiID dockspaceId = ImGui::GetID("MainDockSpace");
+    ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport(), ImGuiDockNodeFlags_None);
+    ensureDefaultDockLayout(dockspaceId, layoutInitialized_);
 
-    if (ImGui::Begin("Scene")) {
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    if (ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
         const ImVec2 avail = ImGui::GetContentRegionAvail();
-        result.sceneSize = {std::max(avail.x, 1.0f), std::max(avail.y, 1.0f)};
+        const ImVec2 canvasSize(std::max(avail.x, 1.0f), std::max(avail.y, 1.0f));
+        result.sceneSize = {canvasSize.x, canvasSize.y};
         result.sceneHovered = ImGui::IsWindowHovered();
         result.sceneFocused = ImGui::IsWindowFocused();
+
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
+        const ImVec2 canvasMax(canvasMin.x + canvasSize.x, canvasMin.y + canvasSize.y);
+        drawList->AddRectFilled(canvasMin, canvasMax, IM_COL32(8, 12, 16, 255));
+
         if (sceneTexture != 0) {
+            const float framebufferAspect =
+                (framebufferSize.y > 0) ? (static_cast<float>(framebufferSize.x) / static_cast<float>(framebufferSize.y))
+                                        : (canvasSize.x / canvasSize.y);
+            const ImVec2 imageSize = fitRectPreservingAspect(canvasSize, framebufferAspect);
+            const ImVec2 imagePos(canvasMin.x + (canvasSize.x - imageSize.x) * 0.5f,
+                                  canvasMin.y + (canvasSize.y - imageSize.y) * 0.5f);
+            drawList->AddRectFilled(imagePos,
+                                    ImVec2(imagePos.x + imageSize.x, imagePos.y + imageSize.y),
+                                    IM_COL32(14, 20, 28, 255));
+            ImGui::SetCursorScreenPos(imagePos);
             ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(sceneTexture)),
-                         avail,
+                         imageSize,
                          ImVec2(0.0f, 1.0f),
                          ImVec2(1.0f, 0.0f));
+            ImGui::SetCursorScreenPos(canvasMax);
         } else {
-            ImGui::TextUnformatted("Scene framebuffer not ready.");
+            const char* message = "Scene framebuffer not ready.";
+            const ImVec2 textSize = ImGui::CalcTextSize(message);
+            drawList->AddText(ImVec2(canvasMin.x + (canvasSize.x - textSize.x) * 0.5f,
+                                     canvasMin.y + (canvasSize.y - textSize.y) * 0.5f),
+                              IM_COL32(188, 198, 210, 255),
+                              message);
+            ImGui::Dummy(canvasSize);
         }
     }
     ImGui::End();
+    ImGui::PopStyleVar();
 
     if (ImGui::Begin("Inspector")) {
         drawScenarioButtons(state);
@@ -520,6 +594,10 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
                     state.derived.cloud.stats.radialCdfSamples,
                     state.derived.cloud.stats.angularScanResolution,
                     state.derived.cloud.stats.monteCarloSamples);
+        ImGui::Text("Numerical radial in cloud = %s (%d component%s)",
+                    state.derived.cloud.stats.usedNumericalRadial ? "yes" : "no",
+                    state.derived.cloud.stats.numericalComponentCount,
+                    (state.derived.cloud.stats.numericalComponentCount == 1) ? "" : "s");
         ImGui::Separator();
         ImGui::Text("Solver E = %.6f eV", state.derived.solver.energyEv);
         ImGui::Text("Solver |error| = %.6e eV", state.derived.solver.errorEv);
@@ -561,6 +639,8 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
         ImGui::Text("FPS: %.2f", performance.fps);
         ImGui::Text("Average frame: %.3f ms", performance.averageFrameMs);
         ImGui::Text("CPU frame: %.3f ms", performance.cpuFrameMs);
+        ImGui::Text("Cloud build worker: %s", performance.cloudBuildInFlight ? "running" : "idle");
+        ImGui::Text("Cloud build queue: %s", performance.cloudBuildQueued ? "pending" : "empty");
         if (performance.gpuTimersSupported) {
             ImGui::Text("GPU frame: %.3f ms", performance.gpuFrameMs);
             ImGui::Text("GPU point pass: %.3f ms", performance.gpuPointMs);
@@ -579,6 +659,7 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
                     performance.renderedPointCount);
         ImGui::Text("Candidates: %d", performance.candidateCount);
         ImGui::Text("Volume slices: %d", performance.volumeSliceCount);
+        ImGui::Text("Volume slice axis: %s", sliceAxisLabel(performance.volumeSliceAxis));
         ImGui::Text("Adaptive multiplier: %.2f", performance.candidateMultiplier);
         ImGui::Text("CDF/Angle/MC: %d / %d / %d",
                     performance.radialCdfSamples,
@@ -596,6 +677,10 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
         ImGui::TextWrapped("Mouse over Scene: left drag orbit, middle drag pan, wheel dolly.");
         ImGui::TextWrapped("Strict Hydrogenic mode is valid for one-electron systems such as H and He+.");
         ImGui::TextWrapped("Multi-electron mode uses Aufbau + Slater Z_eff and is labeled as an approximation.");
+        if (ImGui::Button("Reset Layout")) {
+            layoutInitialized_ = false;
+        }
+        ImGui::SameLine();
         if (ImGui::Button("Copy Demo Script")) {
             std::ostringstream stream;
             stream << "Element Z=" << state.atomicNumber << ", charge=" << state.chargeState

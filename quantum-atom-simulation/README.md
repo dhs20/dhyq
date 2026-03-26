@@ -9,8 +9,10 @@ Modernized 3D atomic visualization system with:
 - data-driven element database
 - Bohr transitions and spectrum view
 - phase-colored Schrodinger probability clouds
+- numerical radial cache can drive the cloud sampler and phase visualization
 - Slater-rule multi-electron teaching approximation
 - finite-difference radial solver with convergence reporting
+- asynchronous cloud regeneration to keep the UI responsive during heavy rebuilds
 - physics/math validation target
 
 ## Build
@@ -54,7 +56,7 @@ build\windows\x64\release\quantum_atom_tests.exe
 - `Inspector`: element, charge, model, transition, cloud, and solver controls
 - `Physics`: current formulas, units, `Z_eff`, transition values, and solver status
 - `Plots`: energy levels, spectra, radial distribution, and convergence
-- `Performance`: FPS, CPU/GPU timing, LOD state, sampling stats, and tracked GPU memory
+- `Performance`: FPS, CPU/GPU timing, async cloud-build state, LOD state, sampling stats, and tracked GPU memory
 - `Help`: concept summary and demo-script export
 - `Log`: runtime and validation messages
 
@@ -89,6 +91,7 @@ Current local verification:
 - hydrogenic radial solver uses a finite-difference tridiagonal eigen solve
 - convergence samples are exposed in the GUI and tests
 - cloud generation tests cover fixed and adaptive sampling-stat paths
+- cloud generation tests verify that numerical-radial overrides actually affect sampled clouds
 
 See:
 

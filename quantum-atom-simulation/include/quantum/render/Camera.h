@@ -18,6 +18,7 @@ public:
     [[nodiscard]] glm::mat4 viewMatrix() const;
     [[nodiscard]] glm::mat4 projectionMatrix() const;
     [[nodiscard]] glm::vec3 position() const;
+    [[nodiscard]] glm::vec3 offsetFromTarget() const;
     [[nodiscard]] float aspectRatio() const;
     [[nodiscard]] float distanceToTarget() const;
 

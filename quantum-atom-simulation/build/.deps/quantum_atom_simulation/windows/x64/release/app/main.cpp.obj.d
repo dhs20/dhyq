@@ -1,5 +1,4 @@
 {
-    depfiles_format = "cl_json",
     values = {
         [[D:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\cl.exe]],
         {
@@ -356,7 +355,16 @@
             \"d:\\\\project\\\\dhyq\\\\.xmake-pkg-install\\\\g\\\\glew\\\\2.2.0\\\\b624c40e764e48a2989368361626750b\\\\include\\\\gl\\\\glew.h\",\
             \"d:\\\\program files\\\\microsoft visual studio\\\\2022\\\\community\\\\vc\\\\tools\\\\msvc\\\\14.44.35207\\\\include\\\\array\",\
             \"d:\\\\project\\\\dhyq\\\\quantum-atom-simulation\\\\include\\\\quantum\\\\ui\\\\appui.h\",\
-            \"d:\\\\project\\\\dhyq\\\\.xmake-pkg-install\\\\g\\\\glfw\\\\3.4\\\\d59f6dd71e7647cc95d2c1d35e51a39a\\\\include\\\\glfw\\\\glfw3.h\"\
+            \"d:\\\\project\\\\dhyq\\\\.xmake-pkg-install\\\\g\\\\glfw\\\\3.4\\\\d59f6dd71e7647cc95d2c1d35e51a39a\\\\include\\\\glfw\\\\glfw3.h\",\
+            \"d:\\\\program files\\\\microsoft visual studio\\\\2022\\\\community\\\\vc\\\\tools\\\\msvc\\\\14.44.35207\\\\include\\\\future\",\
+            \"d:\\\\program files\\\\microsoft visual studio\\\\2022\\\\community\\\\vc\\\\tools\\\\msvc\\\\14.44.35207\\\\include\\\\condition_variable\",\
+            \"d:\\\\program files\\\\microsoft visual studio\\\\2022\\\\community\\\\vc\\\\tools\\\\msvc\\\\14.44.35207\\\\include\\\\functional\",\
+            \"d:\\\\program files\\\\microsoft visual studio\\\\2022\\\\community\\\\vc\\\\tools\\\\msvc\\\\14.44.35207\\\\include\\\\ppltasks.h\",\
+            \"d:\\\\program files\\\\microsoft visual studio\\\\2022\\\\community\\\\vc\\\\tools\\\\msvc\\\\14.44.35207\\\\include\\\\pplwin.h\",\
+            \"d:\\\\program files\\\\microsoft visual studio\\\\2022\\\\community\\\\vc\\\\tools\\\\msvc\\\\14.44.35207\\\\include\\\\pplinterface.h\",\
+            \"d:\\\\program files\\\\microsoft visual studio\\\\2022\\\\community\\\\vc\\\\tools\\\\msvc\\\\14.44.35207\\\\include\\\\ppltaskscheduler.h\",\
+            \"d:\\\\program files\\\\microsoft visual studio\\\\2022\\\\community\\\\vc\\\\tools\\\\msvc\\\\14.44.35207\\\\include\\\\crtdefs.h\",\
+            \"d:\\\\program files\\\\microsoft visual studio\\\\2022\\\\community\\\\vc\\\\tools\\\\msvc\\\\14.44.35207\\\\include\\\\pplcancellation_token.h\"\
         ],\
         \"ImportedModules\": [],\
         \"ImportedHeaderUnits\": []\
@@ -364,5 +372,6 @@
 }",
     files = {
         [[app\main.cpp]]
-    }
+    },
+    depfiles_format = "cl_json"
 }

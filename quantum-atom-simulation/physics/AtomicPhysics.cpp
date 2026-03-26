@@ -421,6 +421,13 @@ double radialProbabilityDensity(int nuclearCharge,
     return radiusM * radiusM * radial * radial;
 }
 
+std::complex<double> sphericalHarmonicValue(const QuantumNumbers& qn, double theta, double phi) {
+    if (!isValidQuantumNumbers(qn)) {
+        return {0.0, 0.0};
+    }
+    return sphericalHarmonic(qn, theta, phi);
+}
+
 std::complex<double> hydrogenicWavefunction(int nuclearCharge,
                                             const QuantumNumbers& qn,
                                             double zeff,

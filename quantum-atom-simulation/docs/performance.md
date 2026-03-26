@@ -9,6 +9,7 @@
 - runtime LOD that reuses the same cached cloud and draws only the densest prefix of the sorted point set
 - interaction LOD that reduces point and slice counts while the camera is actively orbiting/panning/dollying
 - adaptive sampling presets (`Fast`, `Balanced`, `High Fidelity`) that scale candidate count, radial CDF resolution, angular scan resolution, and Monte Carlo normalization samples
+- asynchronous cloud regeneration so heavy point/volume rebuilds no longer block the main UI/render loop
 - GPU timestamp-query timing for whole-frame, point-pass, and volume-pass measurements when supported by the driver/context
 - tracked GPU-memory estimates for the point VBO, volume 3D texture, and scene framebuffer
 - runtime FPS and build-time statistics in the Performance panel
@@ -21,6 +22,7 @@
 - medium/far camera distance thresholds
 - adaptive sampling toggle
 - sampling quality preset
+- background worker state and queue visibility
 - volume resolution
 - extent scale
 - point size
@@ -38,6 +40,7 @@ On the current implementation, the heavy cost is generation time, not draw time:
 The UI exposes:
 
 - current LOD level and camera distance
+- cloud-worker running / queued state
 - requested / accepted / rendered point counts
 - point build time
 - volume build time
@@ -51,6 +54,7 @@ The UI exposes:
 
 - local Windows build passes and launches
 - local test suite passes, including fixed and adaptive cloud-generation-stat checks
+- numerical-radial cloud overrides are covered by a deterministic test with a synthetic radial cache
 - GPU timings are driver-dependent and fall back to zeroed values when timestamp queries are unavailable
 - GPU memory is an application-side estimate of owned buffers/textures/framebuffer attachments, not a vendor-reported total
 

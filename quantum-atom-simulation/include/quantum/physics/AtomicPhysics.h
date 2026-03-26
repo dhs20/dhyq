@@ -169,6 +169,7 @@ double nmToMeter(double nm);
                                               double zeff,
                                               double nuclearMassKg,
                                               double radiusM);
+[[nodiscard]] std::complex<double> sphericalHarmonicValue(const QuantumNumbers& qn, double theta, double phi);
 [[nodiscard]] std::complex<double> hydrogenicWavefunction(int nuclearCharge,
                                                           const QuantumNumbers& qn,
                                                           double zeff,
