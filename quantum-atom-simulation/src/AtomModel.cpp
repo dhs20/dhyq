@@ -1,9 +1,8 @@
 #include "AtomModel.h"
 #include <GL/glut.h>
 
-AtomModel::AtomModel(int atomicNumber, int neutronNumber) {
+AtomModel::AtomModel(int atomicNumber) {
     this->atomicNumber = atomicNumber;
-    this->neutronNumber = neutronNumber;
     this->nucleusRadius = 0.1;
     this->electronRadius = 0.05;
 }
@@ -42,20 +41,9 @@ int AtomModel::getAtomicNumber() const {
     return atomicNumber;
 }
 
-int AtomModel::getNeutronNumber() const {
-    return neutronNumber;
-}
-
 void AtomModel::setAtomicNumber(int atomicNumber) {
     if (atomicNumber > 0) {
         this->atomicNumber = atomicNumber;
-        reset();
-    }
-}
-
-void AtomModel::setNeutronNumber(int neutronNumber) {
-    if (neutronNumber >= 0) {
-        this->neutronNumber = neutronNumber;
         reset();
     }
 }
