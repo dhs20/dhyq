@@ -185,7 +185,7 @@ SingleSolveResult solveSingle(const NumericalSolverRequest& request, int gridPoi
 
     const int radialStateIndex = request.qn.n - request.qn.l - 1;
     if (gridPoints < 32 || radialStateIndex < 0) {
-        result.message = "Invalid finite-difference solver request";
+        result.message = "有限差分求解请求无效";
         return result;
     }
 
@@ -222,7 +222,7 @@ SingleSolveResult solveSingle(const NumericalSolverRequest& request, int gridPoi
     }
 
     result.converged = true;
-    result.message = "Finite-difference tridiagonal eigen solve converged";
+    result.message = "有限差分三对角本征求解已收敛";
     return result;
 }
 
@@ -231,7 +231,7 @@ SingleSolveResult solveSingle(const NumericalSolverRequest& request, int gridPoi
 NumericalSolverResult SchrodingerNumericalSolver::solve(const NumericalSolverRequest& request) const {
     NumericalSolverResult result;
     if (request.qn.n <= 0 || request.qn.l < 0 || request.qn.l >= request.qn.n) {
-        result.message = "Invalid quantum numbers";
+        result.message = "量子数无效";
         return result;
     }
 

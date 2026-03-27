@@ -44,6 +44,9 @@ struct BohrSettings {
 
 struct CloudSettings {
     int pointCount = 100000;
+    bool progressiveBuild = true;
+    int previewPointCount = 18000;
+    int previewVolumeResolution = 20;
     bool enableLod = true;
     bool reduceDuringInteraction = true;
     int mediumLodPointCount = 60000;
@@ -80,6 +83,28 @@ struct ViewSettings {
 struct ReferenceSettings {
     bool enabled = true;
     std::string csvPath = "assets/data/nist_reference_lines.csv";
+};
+
+struct AutoDemoSettings {
+    bool enabled = false;
+    bool loop = true;
+    bool useScriptPlayback = false;
+    double stepDurationSeconds = 6.0;
+    bool restartRequested = false;
+    bool advanceRequested = false;
+    bool loadScriptRequested = false;
+    bool saveScriptRequested = false;
+    bool captureStepRequested = false;
+    bool clearRecordedStepsRequested = false;
+    bool exportBuiltInScriptRequested = false;
+    int currentStepIndex = 0;
+    int loadedStepCount = 0;
+    int recordedStepCount = 0;
+    double stepProgress = 0.0;
+    std::string currentStepName = "手动";
+    std::string activeScriptName = "内置演示";
+    std::string scriptPath = "assets/scenarios/demo_script.json";
+    std::string scriptStatus = "未加载脚本文件";
 };
 
 struct DerivedData {
@@ -119,6 +144,7 @@ struct SimulationState {
     SolverSettings solver;
     ViewSettings view;
     ReferenceSettings reference;
+    AutoDemoSettings demo;
     DerivedData derived;
     DirtyFlags dirty;
 };

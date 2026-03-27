@@ -168,7 +168,8 @@ double nmToMeter(double nm);
                                               const QuantumNumbers& qn,
                                               double zeff,
                                               double nuclearMassKg,
-                                              double radiusM);
+                                              double radiusM,
+                                              bool useReducedMass = true);
 [[nodiscard]] std::complex<double> sphericalHarmonicValue(const QuantumNumbers& qn, double theta, double phi);
 [[nodiscard]] std::complex<double> hydrogenicWavefunction(int nuclearCharge,
                                                           const QuantumNumbers& qn,
@@ -176,19 +177,22 @@ double nmToMeter(double nm);
                                                           double nuclearMassKg,
                                                           double radiusM,
                                                           double theta,
-                                                          double phi);
+                                                          double phi,
+                                                          bool useReducedMass = true);
 [[nodiscard]] ComplexWaveSample evaluateSuperposition(int nuclearCharge,
                                                       const std::vector<SuperpositionComponent>& components,
                                                       double nuclearMassKg,
                                                       double radiusM,
                                                       double theta,
-                                                      double phi);
+                                                      double phi,
+                                                      bool useReducedMass = true);
 [[nodiscard]] std::vector<SuperpositionComponent> normalizedComponents(const std::vector<SuperpositionComponent>& components);
 [[nodiscard]] std::vector<std::pair<double, double>> sampleRadialDistribution(int nuclearCharge,
                                                                               const QuantumNumbers& qn,
                                                                               double zeff,
                                                                               double nuclearMassKg,
                                                                               double maxRadiusM,
-                                                                              int samples);
+                                                                              int samples,
+                                                                              bool useReducedMass = true);
 
 } // namespace quantum::physics

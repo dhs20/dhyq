@@ -111,8 +111,12 @@ std::map<int, std::vector<SubshellOccupancy>> exceptionWhitelist() {
         {42, {{1, 0, 2}, {2, 0, 2}, {2, 1, 6}, {3, 0, 2}, {3, 1, 6}, {4, 0, 1}, {3, 2, 10}, {4, 1, 6}, {5, 0, 1}, {4, 2, 5}}}};
 }
 
-double radialWaveFunction(const QuantumNumbers& qn, double zeff, double nuclearMassKg, double radiusM) {
-    const double a = effectiveBohrRadius(zeff, nuclearMassKg, true);
+double radialWaveFunction(const QuantumNumbers& qn,
+                          double zeff,
+                          double nuclearMassKg,
+                          double radiusM,
+                          bool useReducedMass) {
+    const double a = effectiveBohrRadius(zeff, nuclearMassKg, useReducedMass);
     const double rho = 2.0 * radiusM / (static_cast<double>(qn.n) * a);
     const int order = qn.n - qn.l - 1;
     const double normalization =
@@ -205,19 +209,19 @@ std::string subshellLabel(int n, int l) {
 std::string spectralSeriesName(int finalN) {
     switch (finalN) {
     case 1:
-        return "Lyman";
+        return "莱曼系";
     case 2:
-        return "Balmer";
+        return "巴耳末系";
     case 3:
-        return "Paschen";
+        return "帕邢系";
     case 4:
-        return "Brackett";
+        return "布拉开系";
     case 5:
-        return "Pfund";
+        return "芬德系";
     case 6:
-        return "Humphreys";
+        return "汉弗莱系";
     default:
-        return "n=" + std::to_string(finalN) + " series";
+        return "n=" + std::to_string(finalN) + " 谱系";
     }
 }
 
@@ -249,12 +253,12 @@ TransitionResult computeTransition(const TransitionRequest& request) {
     TransitionResult result;
     if (!isValidQuantumNumbers(request.initial) || !isValidQuantumNumbers(request.final)) {
         result.allowed = false;
-        result.reason = "Invalid quantum numbers";
+        result.reason = "量子数无效";
         return result;
     }
     if (request.final.n >= request.initial.n) {
         result.allowed = false;
-        result.reason = "Final state must be lower than the initial state";
+        result.reason = "末态主量子数必须低于初态";
         return result;
     }
 
@@ -262,13 +266,13 @@ TransitionResult computeTransition(const TransitionRequest& request) {
         const int deltaL = request.final.l - request.initial.l;
         if (std::abs(deltaL) != 1) {
             result.allowed = false;
-            result.reason = "Forbidden by Delta l = +-1";
+            result.reason = "不满足 Delta l = +-1";
         }
         if (request.enforceDeltaM) {
             const int deltaM = request.final.m - request.initial.m;
             if (std::abs(deltaM) > 1) {
                 result.allowed = false;
-                result.reason = "Forbidden by Delta m";
+                result.reason = "不满足 Delta m 选择规则";
             }
         }
     }
@@ -415,8 +419,9 @@ double radialProbabilityDensity(int nuclearCharge,
                                 const QuantumNumbers& qn,
                                 double zeff,
                                 double nuclearMassKg,
-                                double radiusM) {
-    const double radial = radialWaveFunction(qn, zeff, nuclearMassKg, radiusM);
+                                double radiusM,
+                                bool useReducedMass) {
+    const double radial = radialWaveFunction(qn, zeff, nuclearMassKg, radiusM, useReducedMass);
     (void)nuclearCharge;
     return radiusM * radiusM * radial * radial;
 }
@@ -434,12 +439,14 @@ std::complex<double> hydrogenicWavefunction(int nuclearCharge,
                                             double nuclearMassKg,
                                             double radiusM,
                                             double theta,
-                                            double phi) {
+                                            double phi,
+                                            bool useReducedMass) {
     if (!isValidQuantumNumbers(qn)) {
         return {0.0, 0.0};
     }
     (void)nuclearCharge;
-    return radialWaveFunction(qn, zeff, nuclearMassKg, radiusM) * sphericalHarmonic(qn, theta, phi);
+    return radialWaveFunction(qn, zeff, nuclearMassKg, radiusM, useReducedMass) *
+           sphericalHarmonic(qn, theta, phi);
 }
 
 ComplexWaveSample evaluateSuperposition(int nuclearCharge,
@@ -447,12 +454,14 @@ ComplexWaveSample evaluateSuperposition(int nuclearCharge,
                                         double nuclearMassKg,
                                         double radiusM,
                                         double theta,
-                                        double phi) {
+                                        double phi,
+                                        bool useReducedMass) {
     ComplexWaveSample sample;
     for (const auto& component : normalizedComponents(components)) {
         const auto coefficient = std::polar(component.amplitude, component.phaseRadians);
         sample.psi += coefficient *
-                      hydrogenicWavefunction(nuclearCharge, component.qn, component.zeff, nuclearMassKg, radiusM, theta, phi);
+                      hydrogenicWavefunction(
+                          nuclearCharge, component.qn, component.zeff, nuclearMassKg, radiusM, theta, phi, useReducedMass);
     }
     sample.density = std::norm(sample.psi);
     sample.phaseRadians = std::arg(sample.psi);
@@ -480,13 +489,14 @@ std::vector<std::pair<double, double>> sampleRadialDistribution(int nuclearCharg
                                                                 double zeff,
                                                                 double nuclearMassKg,
                                                                 double maxRadiusM,
-                                                                int samples) {
+                                                                int samples,
+                                                                bool useReducedMass) {
     std::vector<std::pair<double, double>> values;
     values.reserve(static_cast<std::size_t>(samples));
     for (int index = 0; index < samples; ++index) {
         const double t = (samples > 1) ? static_cast<double>(index) / static_cast<double>(samples - 1) : 0.0;
         const double radius = maxRadiusM * t;
-        values.emplace_back(radius, radialProbabilityDensity(nuclearCharge, qn, zeff, nuclearMassKg, radius));
+        values.emplace_back(radius, radialProbabilityDensity(nuclearCharge, qn, zeff, nuclearMassKg, radius, useReducedMass));
     }
     return values;
 }

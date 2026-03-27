@@ -34,19 +34,27 @@ void PerformanceTracker::setVolumeBuildMs(double value) {
 }
 
 void PerformanceTracker::setSamplingStats(int requestedPointCount,
+                                          int targetPointCount,
+                                          int targetVolumeResolution,
                                           int acceptedPointCount,
                                           int candidateCount,
                                           double candidateMultiplier,
                                           int radialCdfSamples,
                                           int angularScanResolution,
-                                          int monteCarloSamples) {
+                                          int monteCarloSamples,
+                                          bool previewStage,
+                                          double qualityRatio) {
     requestedPointCount_ = requestedPointCount;
+    targetPointCount_ = targetPointCount;
+    targetVolumeResolution_ = targetVolumeResolution;
     pointCount_ = acceptedPointCount;
     candidateCount_ = candidateCount;
     candidateMultiplier_ = candidateMultiplier;
     radialCdfSamples_ = radialCdfSamples;
     angularScanResolution_ = angularScanResolution;
     monteCarloSamples_ = monteCarloSamples;
+    previewStage_ = previewStage;
+    qualityRatio_ = qualityRatio;
 }
 
 void PerformanceTracker::setCloudBuildState(bool inFlight, bool queued) {
@@ -91,7 +99,10 @@ PerformanceSnapshot PerformanceTracker::snapshot() const {
     snapshot.gpuTimersSupported = gpuTimersSupported_;
     snapshot.cloudBuildInFlight = cloudBuildInFlight_;
     snapshot.cloudBuildQueued = cloudBuildQueued_;
+    snapshot.previewStage = previewStage_;
     snapshot.requestedPointCount = requestedPointCount_;
+    snapshot.targetPointCount = targetPointCount_;
+    snapshot.targetVolumeResolution = targetVolumeResolution_;
     snapshot.pointCount = pointCount_;
     snapshot.candidateCount = candidateCount_;
     snapshot.renderedPointCount = renderedPointCount_;
@@ -100,6 +111,7 @@ PerformanceSnapshot PerformanceTracker::snapshot() const {
     snapshot.lodLevel = lodLevel_;
     snapshot.cameraDistance = cameraDistance_;
     snapshot.candidateMultiplier = candidateMultiplier_;
+    snapshot.qualityRatio = qualityRatio_;
     snapshot.radialCdfSamples = radialCdfSamples_;
     snapshot.angularScanResolution = angularScanResolution_;
     snapshot.monteCarloSamples = monteCarloSamples_;

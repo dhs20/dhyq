@@ -1,9 +1,0 @@
-{
-    packages = {
-        [[D:\project\dhyq\.xmake-pkg-install\g\glfw\3.4\d59f6dd71e7647cc95d2c1d35e51a39a]],
-        [[D:\project\dhyq\.xmake-pkg-install\g\glew\2.2.0\b624c40e764e48a2989368361626750b]],
-        [[D:\project\dhyq\.xmake-pkg-install\g\glm\1.0.1\18615f0387cd4e2ab2e9ea9965afc784]],
-        [[D:\project\dhyq\.xmake-pkg-install\n\nlohmann_json\v3.11.3\826582eb66794908a16a49dbdd33bec4]],
-        [[D:\project\dhyq\.xmake-pkg-install\i\imgui\v1.92.6-docking\deffc05e62384fc79b7c0bf916fa03d3]]
-    }
-}

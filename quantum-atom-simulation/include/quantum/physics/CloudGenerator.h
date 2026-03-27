@@ -2,6 +2,8 @@
 
 #include "quantum/physics/AtomicPhysics.h"
 
+#include <atomic>
+#include <optional>
 #include <vector>
 
 namespace quantum::physics {
@@ -22,10 +24,13 @@ struct VolumeGrid {
 
 struct CloudGenerationStats {
     int requestedPointCount = 0;
+    int targetPointCount = 0;
+    int targetVolumeResolution = 0;
     int candidateCount = 0;
     int acceptedCount = 0;
     int numericalComponentCount = 0;
     double candidateMultiplier = 0.0;
+    double qualityRatio = 1.0;
     int radialCdfSamples = 0;
     int angularScanResolution = 0;
     int monteCarloSamples = 0;
@@ -34,6 +39,7 @@ struct CloudGenerationStats {
     double normalizationEstimate = 1.0;
     double normalizationError = 0.0;
     bool usedNumericalRadial = false;
+    bool previewStage = false;
 };
 
 struct CloudData {
@@ -57,7 +63,9 @@ struct CloudRequest {
     double nuclearMassKg = 0.0;
     bool useReducedMass = true;
     int pointCount = 100000;
+    int targetPointCount = 100000;
     int volumeResolution = 48;
+    int targetVolumeResolution = 48;
     double extentScale = 14.0;
     bool buildVolume = true;
     bool adaptiveSampling = true;
@@ -72,6 +80,7 @@ struct CloudRequest {
 class ProbabilityCloudGenerator {
 public:
     [[nodiscard]] CloudData generate(const CloudRequest& request) const;
+    [[nodiscard]] std::optional<CloudData> generate(const CloudRequest& request, const std::atomic_bool* cancelFlag) const;
 };
 
 } // namespace quantum::physics

@@ -17,7 +17,10 @@ struct PerformanceSnapshot {
     bool gpuTimersSupported = false;
     bool cloudBuildInFlight = false;
     bool cloudBuildQueued = false;
+    bool previewStage = false;
     int requestedPointCount = 0;
+    int targetPointCount = 0;
+    int targetVolumeResolution = 0;
     int pointCount = 0;
     int candidateCount = 0;
     int renderedPointCount = 0;
@@ -26,6 +29,7 @@ struct PerformanceSnapshot {
     int lodLevel = 0;
     double cameraDistance = 0.0;
     double candidateMultiplier = 0.0;
+    double qualityRatio = 1.0;
     int radialCdfSamples = 0;
     int angularScanResolution = 0;
     int monteCarloSamples = 0;
@@ -42,12 +46,16 @@ public:
     void setCloudBuildMs(double value);
     void setVolumeBuildMs(double value);
     void setSamplingStats(int requestedPointCount,
+                          int targetPointCount,
+                          int targetVolumeResolution,
                           int acceptedPointCount,
                           int candidateCount,
                           double candidateMultiplier,
                           int radialCdfSamples,
                           int angularScanResolution,
-                          int monteCarloSamples);
+                          int monteCarloSamples,
+                          bool previewStage,
+                          double qualityRatio);
     void setCloudBuildState(bool inFlight, bool queued);
     void setRenderStats(bool gpuTimersSupported,
                         double gpuFrameMs,
@@ -75,7 +83,10 @@ private:
     bool gpuTimersSupported_ = false;
     bool cloudBuildInFlight_ = false;
     bool cloudBuildQueued_ = false;
+    bool previewStage_ = false;
     int requestedPointCount_ = 0;
+    int targetPointCount_ = 0;
+    int targetVolumeResolution_ = 0;
     int pointCount_ = 0;
     int candidateCount_ = 0;
     int renderedPointCount_ = 0;
@@ -84,6 +95,7 @@ private:
     int lodLevel_ = 0;
     double cameraDistance_ = 0.0;
     double candidateMultiplier_ = 0.0;
+    double qualityRatio_ = 1.0;
     int radialCdfSamples_ = 0;
     int angularScanResolution_ = 0;
     int monteCarloSamples_ = 0;

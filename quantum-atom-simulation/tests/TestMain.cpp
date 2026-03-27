@@ -28,6 +28,40 @@ void expectTrue(const std::string& label, bool condition) {
     }
 }
 
+quantum::physics::CloudRequest makeCloudRequest(int nuclearCharge,
+                                                double nuclearMassKg,
+                                                bool useReducedMass,
+                                                int pointCount,
+                                                int volumeResolution,
+                                                double extentScale,
+                                                bool buildVolume,
+                                                bool adaptiveSampling,
+                                                double candidateMultiplier,
+                                                int radialCdfSamples,
+                                                int angularScanResolution,
+                                                int monteCarloSamples,
+                                                std::vector<quantum::physics::SuperpositionComponent> components,
+                                                quantum::physics::NumericalRadialCache numericalRadial = {}) {
+    quantum::physics::CloudRequest request;
+    request.nuclearCharge = nuclearCharge;
+    request.nuclearMassKg = nuclearMassKg;
+    request.useReducedMass = useReducedMass;
+    request.pointCount = pointCount;
+    request.targetPointCount = pointCount;
+    request.volumeResolution = volumeResolution;
+    request.targetVolumeResolution = volumeResolution;
+    request.extentScale = extentScale;
+    request.buildVolume = buildVolume;
+    request.adaptiveSampling = adaptiveSampling;
+    request.candidateMultiplier = candidateMultiplier;
+    request.radialCdfSamples = radialCdfSamples;
+    request.angularScanResolution = angularScanResolution;
+    request.monteCarloSamples = monteCarloSamples;
+    request.components = std::move(components);
+    request.numericalRadial = std::move(numericalRadial);
+    return request;
+}
+
 } // namespace
 
 int main() {
@@ -41,6 +75,10 @@ int main() {
     expectNear("eV->J", units::evToJoule(13.6), 2.17896022224e-18, 1e-21);
 
     const double hydrogenMass = nuclearMassKg(hydrogen);
+    const auto hydrogenicGround = computeHydrogenicMetrics(1, 1, 1.0, hydrogenMass, true);
+    expectNear("Hydrogen 1s energy (eV)", hydrogenicGround.energyEv, -13.6, 0.05);
+    const auto heliumIonGround = computeHydrogenicMetrics(2, 1, 2.0, hydrogenMass, true);
+    expectNear("He+ 1s energy Z^2 scaling (eV)", heliumIonGround.energyEv, -54.4, 0.2);
 
     const auto lymanAlpha = computeTransition({{2, 1, 0}, {1, 0, 0}, TransitionRuleSet::ElectricDipole, false, 1, 1.0, 1.0, hydrogenMass, true});
     expectTrue("Lyman-alpha allowed", lymanAlpha.allowed);
@@ -84,9 +122,30 @@ int main() {
     }
     expectNear("1s-2s orthogonality", overlap, 0.0, 2e-2);
 
+    const double lightNucleusMass = 2.0 * constants::electronMassKg;
+    const auto reducedMassOff = computeHydrogenicMetrics(1, 1, 1.0, lightNucleusMass, false);
+    const auto reducedMassOn = computeHydrogenicMetrics(1, 1, 1.0, lightNucleusMass, true);
+    expectTrue("Reduced mass changes bound-state energy", std::abs(reducedMassOn.energyEv - reducedMassOff.energyEv) > 1.0);
+    const auto psiReducedOff = hydrogenicWavefunction(1, {1, 0, 0}, 1.0, lightNucleusMass, constants::bohrRadiusM, 0.0, 0.0, false);
+    const auto psiReducedOn = hydrogenicWavefunction(1, {1, 0, 0}, 1.0, lightNucleusMass, constants::bohrRadiusM, 0.0, 0.0, true);
+    const double psiDifference = std::abs(std::abs(psiReducedOn) - std::abs(psiReducedOff));
+    expectTrue("Reduced mass propagates into wavefunction amplitude", psiDifference > 1.0e13);
+
     ProbabilityCloudGenerator cloudGenerator;
-    const auto fixedSamplingCloud = cloudGenerator.generate(
-        {1, hydrogenMass, true, 2000, 0, 12.0, false, false, 2.0, 2048, 24, 2048, {{{2, 1, 0}, 1.0, 0.0, 1.0}}, {}});
+    const auto fixedSamplingCloud =
+        cloudGenerator.generate(makeCloudRequest(1,
+                                                 hydrogenMass,
+                                                 true,
+                                                 2000,
+                                                 0,
+                                                 12.0,
+                                                 false,
+                                                 false,
+                                                 2.0,
+                                                 2048,
+                                                 24,
+                                                 2048,
+                                                 {{{2, 1, 0}, 1.0, 0.0, 1.0}}));
     expectNear("Fixed sampling multiplier", fixedSamplingCloud.stats.candidateMultiplier, 2.0, 1e-9);
     expectTrue("Fixed candidate count", fixedSamplingCloud.stats.candidateCount == 4000);
     expectTrue("Fixed radial CDF samples", fixedSamplingCloud.stats.radialCdfSamples == 2048);
@@ -94,49 +153,61 @@ int main() {
     expectTrue("Fixed monte carlo samples", fixedSamplingCloud.stats.monteCarloSamples == 2048);
     expectTrue("Fixed accepted count", fixedSamplingCloud.stats.acceptedCount == 2000);
 
-    const auto adaptiveSamplingCloud = cloudGenerator.generate({1,
-                                                                hydrogenMass,
-                                                                true,
-                                                                1500,
-                                                                8,
-                                                                12.0,
-                                                                true,
-                                                                true,
-                                                                2.5,
-                                                                4096,
-                                                                48,
-                                                                4096,
-                                                                {{{2, 1, 0}, 0.8, 0.0, 1.0},
-                                                                 {{2, 1, 1}, 0.6, 1.2, 1.0}},
-                                                                {}});
+    const auto adaptiveSamplingCloud =
+        cloudGenerator.generate(makeCloudRequest(1,
+                                                 hydrogenMass,
+                                                 true,
+                                                 1500,
+                                                 8,
+                                                 12.0,
+                                                 true,
+                                                 true,
+                                                 2.5,
+                                                 4096,
+                                                 48,
+                                                 4096,
+                                                 {{{2, 1, 0}, 0.8, 0.0, 1.0}, {{2, 1, 1}, 0.6, 1.2, 1.0}}));
     expectTrue("Adaptive multiplier increases", adaptiveSamplingCloud.stats.candidateMultiplier > 2.5);
     expectTrue("Adaptive candidate count increases", adaptiveSamplingCloud.stats.candidateCount > 3750);
     expectTrue("Adaptive radial CDF increases", adaptiveSamplingCloud.stats.radialCdfSamples > 4096);
     expectTrue("Adaptive angular scan increases", adaptiveSamplingCloud.stats.angularScanResolution >= 48);
     expectTrue("Adaptive monte carlo increases", adaptiveSamplingCloud.stats.monteCarloSamples > 4096);
 
-    const auto analyticCloud = cloudGenerator.generate(
-        {1, hydrogenMass, true, 512, 0, 10.0, false, false, 2.0, 1024, 24, 1024, {{{1, 0, 0}, 1.0, 0.0, 1.0}}, {}});
+    const auto analyticCloud =
+        cloudGenerator.generate(makeCloudRequest(1,
+                                                 hydrogenMass,
+                                                 true,
+                                                 512,
+                                                 0,
+                                                 10.0,
+                                                 false,
+                                                 false,
+                                                 2.0,
+                                                 1024,
+                                                 24,
+                                                 1024,
+                                                 {{{1, 0, 0}, 1.0, 0.0, 1.0}}));
     NumericalRadialCache syntheticCache;
     syntheticCache.valid = true;
     syntheticCache.qn = {1, 0, 0};
     syntheticCache.zeff = 1.0;
     syntheticCache.radiiMeters = {0.0, 2.0 * constants::bohrRadiusM, 4.0 * constants::bohrRadiusM, 8.0 * constants::bohrRadiusM};
     syntheticCache.radialValues = {0.0, 0.0, 1.0e5, 0.0};
-    const auto numericalCloud = cloudGenerator.generate({1,
-                                                         hydrogenMass,
-                                                         true,
-                                                         512,
-                                                         0,
-                                                         10.0,
-                                                         false,
-                                                         false,
-                                                         2.0,
-                                                         1024,
-                                                         24,
-                                                         1024,
-                                                         {{{1, 0, 0}, 1.0, 0.0, 1.0}},
-                                                         syntheticCache});
+    const auto numericalCloud =
+        cloudGenerator.generate(makeCloudRequest(1,
+                                                 hydrogenMass,
+                                                 true,
+                                                 512,
+                                                 0,
+                                                 10.0,
+                                                 false,
+                                                 false,
+                                                 2.0,
+                                                 1024,
+                                                 24,
+                                                 1024,
+                                                 {{{1, 0, 0}, 1.0, 0.0, 1.0}},
+                                                 syntheticCache));
     expectTrue("Numerical radial flag propagated", numericalCloud.stats.usedNumericalRadial);
     expectTrue("Numerical radial component count", numericalCloud.stats.numericalComponentCount == 1);
     const auto analyticRadius = std::sqrt(static_cast<double>(analyticCloud.points.front().x) * analyticCloud.points.front().x +

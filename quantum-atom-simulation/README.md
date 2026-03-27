@@ -50,6 +50,13 @@ Tests:
 build\windows\x64\release\quantum_atom_tests.exe
 ```
 
+Direct Windows launchers:
+
+- [run_release.bat](D:/project/dhyq/quantum-atom-simulation/run_release.bat): launch the release app directly
+- [verify_project.bat](D:/project/dhyq/quantum-atom-simulation/verify_project.bat): run tests, then launch the app
+
+The executable now resolves the project root automatically, so launching it from `build/windows/x64/release/` also works without manually setting the working directory.
+
 ## GUI Panels
 
 - `Scene`: 3D viewport with orbit rings, point clouds, and volume slices

@@ -4,6 +4,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cmath>
 #include <vector>
@@ -75,6 +76,7 @@ constexpr const char* kPointFragmentShader = R"(
 #version 330 core
 in float vDensity;
 in float vPhase;
+uniform float uTime;
 out vec4 FragColor;
 
 vec3 hsv2rgb(vec3 c) {
@@ -90,7 +92,8 @@ void main() {
         discard;
     }
     float hue = (vPhase + 3.14159265) / (2.0 * 3.14159265);
-    vec3 color = hsv2rgb(vec3(hue, 0.85, clamp(0.35 + 0.8 * vDensity, 0.0, 1.0)));
+    float shimmer = 0.90 + 0.10 * sin(uTime * 1.7 + vPhase * 2.5);
+    vec3 color = hsv2rgb(vec3(hue, 0.85, clamp((0.35 + 0.8 * vDensity) * shimmer, 0.0, 1.0)));
     float alpha = clamp(vDensity * (1.0 - radius), 0.0, 1.0);
     FragColor = vec4(color, alpha);
 }
@@ -128,6 +131,7 @@ constexpr const char* kVolumeFragmentShader = R"(
 in vec3 vTexCoord;
 uniform sampler3D uVolumeTexture;
 uniform float uExposure;
+uniform float uTime;
 out vec4 FragColor;
 
 vec3 hsv2rgb(vec3 c) {
@@ -144,7 +148,8 @@ void main() {
         discard;
     }
     float hue = (phase + 3.14159265) / (2.0 * 3.14159265);
-    vec3 color = hsv2rgb(vec3(hue, 0.8, clamp(density * uExposure, 0.0, 1.0)));
+    float shimmer = 0.92 + 0.08 * sin(uTime * 1.2 + phase * 1.3);
+    vec3 color = hsv2rgb(vec3(hue, 0.8, clamp(density * uExposure * shimmer, 0.0, 1.0)));
     FragColor = vec4(color, density * 0.08);
 }
 )";
@@ -215,6 +220,11 @@ std::vector<float> makeGridVertices(int halfExtent, float spacing) {
 
 double nanosecondsToMilliseconds(GLuint64 value) {
     return static_cast<double>(value) * 1.0e-6;
+}
+
+float animationTimeSeconds() {
+    const auto now = std::chrono::steady_clock::now().time_since_epoch();
+    return static_cast<float>(std::chrono::duration<double>(now).count());
 }
 
 } // namespace
@@ -333,6 +343,7 @@ SceneRenderStats SceneRenderer::render(const quantum::app::SimulationState& stat
 
     const glm::mat4 view = camera.viewMatrix();
     const glm::mat4 projection = camera.projectionMatrix();
+    const float animationTime = animationTimeSeconds();
     const bool pointPassEnabled = state.view.cloudRenderMode == quantum::app::CloudRenderMode::PointCloud ||
                                   state.view.cloudRenderMode == quantum::app::CloudRenderMode::Hybrid;
     const bool volumePassEnabled = state.view.cloudRenderMode == quantum::app::CloudRenderMode::VolumeSlices ||
@@ -345,17 +356,17 @@ SceneRenderStats SceneRenderer::render(const quantum::app::SimulationState& stat
     if (state.view.showGrid) {
         renderGrid(view, projection);
     }
-    renderNucleus(view, projection);
+    renderNucleus(view, projection, animationTime);
     if (state.view.showOrbitRings || state.modelKind == quantum::app::ModelKind::Bohr ||
         state.modelKind == quantum::app::ModelKind::Compare) {
-        renderOrbits(state, view, projection);
+        renderOrbits(state, view, projection, animationTime);
     }
 
     if (pointPassEnabled) {
         if (gpuTimersSupported_) {
             glQueryCounter(timerSet.pointStart, GL_TIMESTAMP);
         }
-        renderPointCloud(state, view, projection, lod.renderedPointCount);
+        renderPointCloud(state, view, projection, lod.renderedPointCount, animationTime);
         if (gpuTimersSupported_) {
             glQueryCounter(timerSet.pointEnd, GL_TIMESTAMP);
             timerSet.pointIssued = true;
@@ -365,7 +376,7 @@ SceneRenderStats SceneRenderer::render(const quantum::app::SimulationState& stat
         if (gpuTimersSupported_) {
             glQueryCounter(timerSet.volumeStart, GL_TIMESTAMP);
         }
-        renderVolume(state, view, projection, lod.volumeSliceCount, slicePlan);
+        renderVolume(state, view, projection, lod.volumeSliceCount, slicePlan, animationTime);
         if (gpuTimersSupported_) {
             glQueryCounter(timerSet.volumeEnd, GL_TIMESTAMP);
             timerSet.volumeIssued = true;
@@ -582,9 +593,10 @@ void SceneRenderer::renderGrid(const glm::mat4& view, const glm::mat4& projectio
     gridMesh_.draw();
 }
 
-void SceneRenderer::renderNucleus(const glm::mat4& view, const glm::mat4& projection) {
+void SceneRenderer::renderNucleus(const glm::mat4& view, const glm::mat4& projection, float animationTimeSeconds) {
     meshShader_.use();
-    const glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(0.18f));
+    const float pulse = 1.0f + 0.08f * std::sin(animationTimeSeconds * 2.2f);
+    const glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(0.18f * pulse));
     glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uModel"), 1, GL_FALSE, glm::value_ptr(model));
     glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uView"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uProjection"), 1, GL_FALSE, glm::value_ptr(projection));
@@ -595,11 +607,13 @@ void SceneRenderer::renderNucleus(const glm::mat4& view, const glm::mat4& projec
 
 void SceneRenderer::renderOrbits(const quantum::app::SimulationState& state,
                                  const glm::mat4& view,
-                                 const glm::mat4& projection) {
+                                 const glm::mat4& projection,
+                                 float animationTimeSeconds) {
     meshShader_.use();
     glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uView"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uProjection"), 1, GL_FALSE, glm::value_ptr(projection));
-    glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), 0.58f, 0.67f, 0.74f);
+    const float glow = 0.90f + 0.10f * std::sin(animationTimeSeconds * 1.4f);
+    glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), 0.58f * glow, 0.67f * glow, 0.74f * glow);
     glUniform3f(glGetUniformLocation(meshShader_.id(), "uLightDir"), -0.4f, 1.0f, 0.2f);
 
     const int maxN = std::max({state.bohr.principalN, state.transition.initial.n, state.transition.final.n, 1});
@@ -616,7 +630,8 @@ void SceneRenderer::renderOrbits(const quantum::app::SimulationState& state,
 void SceneRenderer::renderPointCloud(const quantum::app::SimulationState& state,
                                      const glm::mat4& view,
                                      const glm::mat4& projection,
-                                     int renderedPointCount) {
+                                     int renderedPointCount,
+                                     float animationTimeSeconds) {
     if (pointVao_ == 0 || pointCount_ == 0 || renderedPointCount <= 0) {
         return;
     }
@@ -624,6 +639,7 @@ void SceneRenderer::renderPointCloud(const quantum::app::SimulationState& state,
     glUniformMatrix4fv(glGetUniformLocation(pointShader_.id(), "uView"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(pointShader_.id(), "uProjection"), 1, GL_FALSE, glm::value_ptr(projection));
     glUniform1f(glGetUniformLocation(pointShader_.id(), "uPointSize"), state.view.pointSize);
+    glUniform1f(glGetUniformLocation(pointShader_.id(), "uTime"), animationTimeSeconds);
 
     glBindVertexArray(pointVao_);
     glDrawArrays(GL_POINTS, 0, std::min<GLsizei>(pointCount_, static_cast<GLsizei>(renderedPointCount)));
@@ -634,7 +650,8 @@ void SceneRenderer::renderVolume(const quantum::app::SimulationState& state,
                                  const glm::mat4& view,
                                  const glm::mat4& projection,
                                  int sliceCount,
-                                 const VolumeSlicePlan& slicePlan) {
+                                 const VolumeSlicePlan& slicePlan,
+                                 float animationTimeSeconds) {
     if (volumeTexture_.id() == 0 || volumeExtent_ <= 0.0f || sliceCount <= 0) {
         return;
     }
@@ -644,6 +661,7 @@ void SceneRenderer::renderVolume(const quantum::app::SimulationState& state,
     glUniformMatrix4fv(glGetUniformLocation(volumeShader_.id(), "uView"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(volumeShader_.id(), "uProjection"), 1, GL_FALSE, glm::value_ptr(projection));
     glUniform1f(glGetUniformLocation(volumeShader_.id(), "uExposure"), state.view.exposure);
+    glUniform1f(glGetUniformLocation(volumeShader_.id(), "uTime"), animationTimeSeconds);
     glUniform1i(glGetUniformLocation(volumeShader_.id(), "uVolumeTexture"), 0);
     glUniform1i(glGetUniformLocation(volumeShader_.id(), "uSliceAxis"), slicePlan.axis);
     volumeTexture_.bind(GL_TEXTURE0);
