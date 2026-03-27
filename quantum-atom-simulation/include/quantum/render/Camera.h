@@ -24,6 +24,9 @@ public:
     void update(float deltaTimeSeconds);
     void jumpToPose(const Pose& pose);
     void animateToPose(const Pose& pose);
+    void setTransitionDuration(float seconds);
+    void setDistanceLimits(float minDistance, float maxDistance);
+    void setClipPlanes(float nearPlane, float farPlane);
 
     [[nodiscard]] glm::mat4 viewMatrix() const;
     [[nodiscard]] glm::mat4 projectionMatrix() const;
@@ -40,6 +43,11 @@ private:
     bool transitioning_ = false;
     int width_ = 1280;
     int height_ = 720;
+    float minDistance_ = 1.0f;
+    float maxDistance_ = 120.0f;
+    float nearPlane_ = 0.01f;
+    float farPlane_ = 500.0f;
+    float transitionDurationSeconds_ = 0.65f;
 };
 
 } // namespace quantum::render

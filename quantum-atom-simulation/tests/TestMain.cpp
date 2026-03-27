@@ -1,16 +1,34 @@
 #include "quantum/physics/AtomicPhysics.h"
+#include "quantum/physics/CentralField.h"
 #include "quantum/physics/CloudGenerator.h"
 #include "quantum/physics/ElementDatabase.h"
 #include "quantum/physics/NumericalSolver.h"
+#include "quantum/spectroscopy/HydrogenicCorrections.h"
+#include "quantum/validation/ValidationReportWriter.h"
 
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
 namespace {
 
 int failures = 0;
+
+std::filesystem::path locateProjectRoot() {
+    auto path = std::filesystem::current_path();
+    for (int depth = 0; depth < 6; ++depth) {
+        if (std::filesystem::exists(path / "assets" / "data" / "elements.json")) {
+            return path;
+        }
+        if (!path.has_parent_path()) {
+            break;
+        }
+        path = path.parent_path();
+    }
+    return std::filesystem::current_path();
+}
 
 void expectNear(const std::string& label, double actual, double expected, double tolerance) {
     const double error = std::abs(actual - expected);
@@ -68,8 +86,20 @@ int main() {
     using namespace quantum::physics;
 
     ElementDatabase database;
-    database.loadBuiltInSubset();
+    const auto projectRoot = locateProjectRoot();
+    const auto elementsPath = projectRoot / "assets" / "data" / "elements.json";
+    const auto referencesPath = projectRoot / "assets" / "data" / "nist_reference_lines.csv";
+    if (!database.loadFromJson(elementsPath)) {
+        database.loadBuiltInSubset();
+    }
+    (void)database.loadReferenceTransitions(referencesPath);
     const auto hydrogen = database.elementByAtomicNumber(1);
+    const auto oganesson = database.elementByAtomicNumber(118);
+    expectTrue("Element metadata method", !hydrogen.method.methodName.empty());
+    expectTrue("Element metadata source", !hydrogen.source.id.empty());
+    expectTrue("Periodic metadata coverage", oganesson.symbol == "Og");
+    expectTrue("Hydrogen Chinese name", hydrogen.localizedNameZh == "氢");
+    expectTrue("Oganesson Chinese name", !oganesson.localizedNameZh.empty());
 
     expectNear("Bohr radius", constants::bohrRadiusM, 5.29177210903e-11, 1e-20);
     expectNear("eV->J", units::evToJoule(13.6), 2.17896022224e-18, 1e-21);
@@ -83,19 +113,39 @@ int main() {
     const auto lymanAlpha = computeTransition({{2, 1, 0}, {1, 0, 0}, TransitionRuleSet::ElectricDipole, false, 1, 1.0, 1.0, hydrogenMass, true});
     expectTrue("Lyman-alpha allowed", lymanAlpha.allowed);
     expectNear("Lyman-alpha wavelength (nm)", lymanAlpha.wavelengthNm, 121.567, 0.15);
+    expectTrue("Lyman-alpha method metadata", !lymanAlpha.method.methodName.empty());
+    expectTrue("Lyman-alpha validation record", !lymanAlpha.validation.empty());
 
     const auto balmerAlpha = computeTransition({{3, 1, 0}, {2, 0, 0}, TransitionRuleSet::ElectricDipole, false, 1, 1.0, 1.0, hydrogenMass, true});
     expectTrue("Balmer-alpha allowed", balmerAlpha.allowed);
     expectNear("Balmer-alpha wavelength (nm)", balmerAlpha.wavelengthNm, 656.279, 0.4);
 
+    const auto spectrum = generateSpectrum(1, 4, 1.0, hydrogenMass, TransitionRuleSet::ElectricDipole, false, true);
+    expectTrue("Spectrum line provenance", !spectrum.empty() && !spectrum.front().provenance.recordId.empty());
+    expectTrue("Spectrum line source", !spectrum.empty() && !spectrum.front().source.id.empty());
+
+    const auto levels = generateEnergyLevels(1, 3, 1.0, hydrogenMass, true);
+    expectTrue("Energy level metadata", !levels.empty() && !levels.front().method.methodName.empty());
+    expectTrue("Energy level provenance", !levels.empty() && !levels.front().provenance.recordId.empty());
+
     const auto forbidden = computeTransition({{2, 0, 0}, {1, 0, 0}, TransitionRuleSet::ElectricDipole, false, 1, 1.0, 1.0, hydrogenMass, true});
     expectTrue("2s->1s forbidden", !forbidden.allowed);
 
+    const auto referenceTransitions = database.referenceTransitions(1);
+    expectTrue("Reference transitions available", !referenceTransitions.empty());
+    if (!referenceTransitions.empty()) {
+        expectTrue("Reference transition method metadata", !referenceTransitions.front().method.methodName.empty());
+        expectTrue("Reference transition provenance", !referenceTransitions.front().provenance.recordId.empty());
+    }
+
     const auto neonConfig = buildElectronConfiguration(10, 0);
     expectTrue("Ne configuration", neonConfig.notation == "1s2 2s2 2p6");
+    expectTrue("Configuration method metadata", !neonConfig.method.methodName.empty());
 
     const auto slater = computeSlaterShielding(10, neonConfig, 2, 1);
     expectNear("Ne 2p Z_eff", slater.zeff, 5.85, 0.3);
+    expectTrue("Slater method metadata", !slater.method.methodName.empty());
+    expectTrue("Slater validation record", !slater.validation.empty());
 
     const auto radial = sampleRadialDistribution(1, {1, 0, 0}, 1.0, hydrogenMass, 20.0 * constants::bohrRadiusM, 4096);
     double integral = 0.0;
@@ -219,15 +269,76 @@ int main() {
     expectTrue("Numerical radial changes sampled cloud",
                std::abs(numericalRadius - analyticRadius) > 0.5 * constants::bohrRadiusM);
 
+    CentralFieldParameters hydrogenicField;
+    hydrogenicField.mode = CentralFieldMode::HydrogenicCoulomb;
+    hydrogenicField.nuclearCharge = 1;
+    hydrogenicField.ionCharge = 0;
+    hydrogenicField.zeff = 1.0;
+    const auto fieldProfile = sampleCentralFieldProfile(hydrogenicField, 80.0, 80);
+    expectTrue("Central field samples exist", !fieldProfile.samples.empty());
+    expectNear("Central field near charge", fieldProfile.samples.front().effectiveCharge, 1.0, 1e-3);
+    expectTrue("Central field validation metadata", !fieldProfile.validation.empty());
+
     SchrodingerNumericalSolver solver;
-    const auto numerical = solver.solve({1, 1.0, hydrogenMass, true, {1, 0, 0}, 4096, 4, 120.0});
+    NumericalSolverRequest solverRequest;
+    solverRequest.nuclearCharge = 1;
+    solverRequest.zeff = 1.0;
+    solverRequest.nuclearMassKg = hydrogenMass;
+    solverRequest.useReducedMass = true;
+    solverRequest.centralField = hydrogenicField;
+    solverRequest.qn = {1, 0, 0};
+    solverRequest.gridPoints = 4096;
+    solverRequest.convergencePasses = 4;
+    solverRequest.maxScaledRadius = 120.0;
+    const auto numerical = solver.solve(solverRequest);
     expectTrue("Numerical solver converged", numerical.converged);
     expectNear("Numerical 1s error (eV)", numerical.errorEv, 0.0, 0.2);
     expectTrue("Numerical solver is purely numerical", numerical.message.find("fallback") == std::string::npos);
     expectTrue("Convergence samples exist", !numerical.convergence.empty());
+    expectTrue("Numerical solver method metadata", !numerical.method.methodName.empty());
+    expectTrue("Numerical solver validation record", !numerical.validation.empty());
+    expectTrue("Numerical solver central field profile", !numerical.centralFieldProfile.samples.empty());
     if (numerical.convergence.size() >= 2) {
         expectTrue("Convergence improves with refinement",
                    numerical.convergence.back().errorEv <= numerical.convergence.front().errorEv + 1e-4);
+        expectTrue("Convergence validation metadata", !numerical.convergence.front().validation.caseName.empty());
+    }
+
+    quantum::spectroscopy::SpectroscopySettings spectroscopySettings;
+    spectroscopySettings.applyFineStructure = true;
+    spectroscopySettings.applyZeeman = true;
+    spectroscopySettings.magneticFieldTesla = 2.0;
+    const auto correctedTransition = quantum::spectroscopy::evaluateHydrogenicCorrections(
+        {{2, 1, 1}, {1, 0, 0}, TransitionRuleSet::ElectricDipole, true, 1, 1.0, 1.0, hydrogenMass, true},
+        lymanAlpha,
+        spectroscopySettings,
+        hydrogenMass);
+    expectTrue("Tier 3 spectroscopy applied", correctedTransition.applied);
+    expectTrue("Tier 3 spectroscopy method metadata", !correctedTransition.method.methodName.empty());
+    expectTrue("Tier 3 spectroscopy validation", !correctedTransition.validation.empty());
+    expectTrue("Tier 3 corrected wavelength positive", correctedTransition.correctedWavelengthNm > 0.0);
+
+    quantum::validation::ValidationReportWriter reportWriter;
+    quantum::validation::ValidationReportInput reportInput;
+    reportInput.title = "Test Validation Report";
+    reportInput.subject = "Hydrogen";
+    reportInput.summary = "Regression test snapshot";
+    reportInput.approximationWarning = "Strict hydrogenic test case";
+    reportInput.outputStem = "test-validation-report";
+    reportInput.methods.push_back({"Transition", lymanAlpha.method});
+    reportInput.methods.push_back({"Solver", numerical.method});
+    reportInput.records = lymanAlpha.validation;
+    reportInput.records.insert(reportInput.records.end(), numerical.validation.begin(), numerical.validation.end());
+    const auto reportPath =
+        std::filesystem::temp_directory_path() / "quantum_atom_simulation_test_validation_report.md";
+    const auto reportResult = reportWriter.write(reportInput, reportPath);
+    expectTrue("Validation report markdown export", reportResult.ok && std::filesystem::exists(reportResult.markdownPath));
+    expectTrue("Validation report json export", reportResult.ok && std::filesystem::exists(reportResult.jsonPath));
+    if (std::filesystem::exists(reportResult.markdownPath)) {
+        std::filesystem::remove(reportResult.markdownPath);
+    }
+    if (std::filesystem::exists(reportResult.jsonPath)) {
+        std::filesystem::remove(reportResult.jsonPath);
     }
 
     if (failures == 0) {

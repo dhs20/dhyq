@@ -39,6 +39,10 @@ public:
     void shutdown();
     void resize(int width, int height);
     void uploadCloud(const quantum::physics::CloudData& cloud);
+    void configureCameraForScene(const quantum::app::SimulationState& state, OrbitCamera& camera) const;
+    [[nodiscard]] OrbitCamera::Pose fitScenePose(const quantum::app::SimulationState& state,
+                                                 const OrbitCamera& camera,
+                                                 quantum::app::SceneFitMode mode) const;
     [[nodiscard]] SceneRenderStats render(const quantum::app::SimulationState& state, OrbitCamera& camera);
 
     [[nodiscard]] GLuint sceneTexture() const;
@@ -76,7 +80,11 @@ private:
     void resolveGpuTimers();
     [[nodiscard]] LODDecision decideLod(const quantum::app::SimulationState& state, const OrbitCamera& camera) const;
     [[nodiscard]] VolumeSlicePlan chooseVolumeSlicePlan(const OrbitCamera& camera) const;
-    void renderGrid(const glm::mat4& view, const glm::mat4& projection);
+    [[nodiscard]] float estimateSceneExtent(const quantum::app::SimulationState& state) const;
+    void renderGrid(const quantum::app::SimulationState& state,
+                    const OrbitCamera& camera,
+                    const glm::mat4& view,
+                    const glm::mat4& projection);
     void renderNucleus(const glm::mat4& view, const glm::mat4& projection, float animationTimeSeconds);
     void renderOrbits(const quantum::app::SimulationState& state,
                       const glm::mat4& view,

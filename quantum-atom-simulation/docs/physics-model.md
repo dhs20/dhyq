@@ -80,6 +80,12 @@ Point generation uses:
 - cached candidate filtering for 1e5-point clouds
 - optional numerical-radial interpolation from the finite-difference solver when the selected `(n, l)` matches the cached solver state
 
+Animation note:
+
+- most current scene motion is illustrative or pedagogical
+- superposition visuals show basis-state interference structure
+- this is not a direct time-dependent TDSE / TD-CI propagation result
+
 ## Numerical Solver
 
 The project includes a `SchrodingerNumericalSolver` for the radial Coulomb equation using a finite-difference tridiagonal eigen solve.

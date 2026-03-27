@@ -1,257 +1,224 @@
-# 3D Atomic Visualization Refactor Design
+# Quantum Atom Simulation Design
 
-## Goals
+## 1. 项目定位
 
-This refactor replaces the legacy `freeglut + fixed-function immediate mode` prototype with a modular, testable, data-driven system that satisfies the following engineering requirements:
+这是一个“教学展示 + 数值验证 + 可扩展架构预留”的多保真度原子结构/光谱/可视化平台。
 
-- Modern OpenGL 3.3 Core rendering with shader-based pipelines and explicit GPU buffers.
-- Dockable GUI with scene, inspector, physics, plots, performance, help, and log panels.
-- Unified physics-facing unit system based on SI outputs and explicit display-unit conversion in the UI.
-- Verifiable hydrogenic physics for H and hydrogen-like ions, plus approximate multi-electron teaching mode using Aufbau filling and Slater shielding.
-- Probability-cloud visualization with explicit complex phase, superposition support, cached sampling, and volume-slice rendering.
-- Numerical radial Schrödinger solver with convergence diagnostics and overlay against analytical hydrogenic references.
-- Documentation, examples, and automated physics/math tests.
+当前第一目标不是研究级高精度原子结构，而是：
 
-## Module Layout
+- clean clone 后可构建
+- Windows x64 可运行
+- 最小演示可完成
+- 科学表述不误导
+- 后续高阶物理模块有清晰落点
 
-The new codebase is split into five top-level implementation areas and a single public include tree:
+## 2. 当前真实能力
+
+### 已实现
+
+- `xmake` 主构建系统
+- `GLFW + GLEW + OpenGL 3.3 Core`
+- Docking GUI 与多面板工具界面
+- 严格氢样解析模型
+- `Z_eff + Slater` 多电子教学近似
+- 径向有限差分求解器
+- 谱线、能级、径向分布、收敛曲线
+- 异步概率云构建、预览云优先
+- 自动演示脚本录制与回放
+
+### 未实现但必须诚实标注
+
+- HF / Dirac-Fock / DFT
+- CI / MCSCF / CASSCF
+- fine structure / hyperfine / Zeeman / Stark
+- 真实 TDSE / TD-CI 动力学
+- 完整周期表高精度求解
+
+## 3. 模块划分
+
+### 当前实现模块
 
 - `app/`
-  - Application bootstrapping, dependency wiring, asset-path resolution, and main update loop.
-  - Owns the simulation state and coordinates physics recomputation, UI, and rendering.
+  - 程序入口、路径定位、任务调度、演示脚本、状态同步
 - `core/`
-  - Logging, timers, lightweight profiling, and cross-module utility code.
+  - 日志、路径、性能统计
 - `physics/`
-  - CODATA constants, units, hydrogenic formulas, transition/spectrum generation, element database loading, electron configuration, Slater rules, analytical wavefunctions, cloud sampling, and numerical solver.
+  - 常数、Bohr/氢样模型、`Z_eff`、Slater、电子组态、云采样、数值求解
 - `render/`
-  - OpenGL objects, camera, framebuffers, shaders, scene rendering, point clouds, orbit lines, energy overlays, and volume slices.
+  - 相机、OpenGL 对象、点云/体切片/轨道渲染
 - `ui/`
-  - ImGui docking shell and all user-facing panels, charts, report widgets, and validation summaries.
+  - Scene / Inspector / Physics / Plots / Performance / Help / Log
 - `tests/`
-  - Standalone binary for constants, transitions, electron configuration, Slater-rule sanity checks, wavefunction normalization, and solver convergence assertions.
+  - 物理与数值回归测试
+
+### 结构预留模块
+
+- `basis/`
+- `solvers/`
+- `spectroscopy/`
+- `dynamics/`
+- `data/`
+- `validation/`
+- `examples/`
+
+## 4. 结果元数据与接口骨架
+
+新增接口和元数据类型位于 `include/quantum/...`：
 
-## Public Interfaces
+- `meta/MethodMetadata.h`
+  - `MethodStamp`
+  - `ValidationRecord`
+  - `SourceRecord`
+  - `ProvenanceRecord`
+- `data/Records.h`
+  - `ElementRecord`
+  - `IsotopeRecord`
+  - `ConfigurationRecord`
+  - `StateRecord`
+  - `TransitionRecord`
+- `data/DataProvider.h`
+- `model/AtomModel.h`
+- `solvers/OrbitalSolver.h`
+- `solvers/MeanFieldSolver.h`
+- `physics/ConfigurationBuilder.h`
+- `physics/HamiltonianAssembler.h`
+- `spectroscopy/SpectralEngine.h`
+- `dynamics/DynamicsEngine.h`
+- `validation/ValidationRunner.h`
+
+设计原则：
+
+- 每个结果对象都可挂方法与验证元数据
+- 可视化对象不等于物理解本身
+- 教学近似层与未来高保真层强制分离
+
+## 5. 数据流
+
+1. `Application` 定位项目根目录并加载资源。
+2. `SimulationState` 保存 GUI 参数和脏标记。
+3. `physics/` 根据状态生成：
+   - Bohr/氢样指标
+   - 跃迁与谱线
+   - `Z_eff` 与电子组态
+   - 径向分布
+   - 数值求解结果
+   - 概率云数据
+4. `render/SceneRenderer` 将缓存结果转为 GPU 资源。
+5. `ui/AppUi` 读取同一批缓存结果进行参数面板、图表和日志展示。
 
-Headers live under `include/quantum/...` and are grouped by subsystem:
+## 6. 渲染管线
 
-- `include/quantum/core/*`
-- `include/quantum/physics/*`
-- `include/quantum/render/*`
-- `include/quantum/ui/*`
+当前真实渲染栈：
 
-The physics layer is intentionally renderer-independent. The rendering and UI layers consume immutable or cached physics outputs rather than performing analytical work every frame.
+- 窗口：`GLFW`
+- OpenGL loader：`GLEW`
+- API：`OpenGL 3.3 Core`
+- GUI：`ImGui Docking`
+- 图表：当前为自绘交互图，不依赖 `ImPlot`
 
-## Data Flow
+主要渲染对象：
 
-1. `Application` loads `assets/data/elements.json`, demo scenarios, and reference spectrum CSV files.
-2. GUI changes mutate `SimulationState`.
-3. Dirty flags trigger physics recomputation:
-   - Bohr metrics and spectrum lines
-   - Electron configuration and Slater shielding
-   - Analytical wavefunction caches
-   - Probability cloud / volume texture caches
-   - Numerical solver caches
-4. `SceneRenderer` renders into an off-screen framebuffer.
-5. The Scene panel displays the framebuffer texture; other panels read the same cached state to plot graphs and tables.
-6. Performance counters and logs are persisted frame-to-frame for diagnostics.
+- 核、轨道环
+- 能级标记
+- 概率点云
+- 体切片
+- 场景帧缓冲
 
-## Rendering Pipeline
+性能策略：
 
-### Windowing and Context
+- 仅在数据脏时重建 VBO/纹理
+- 点云支持 LOD 与交互降级
+- 概率云支持预览阶段与全质量阶段
+- GPU 计时器和显存跟踪进入 Performance 面板
 
-- GLFW window
-- OpenGL 3.3 Core Profile
-- GLAD loader
-- ImGui docking + ImPlot
+## 7. 物理能力分层
 
-### GPU Objects
+### Tier 0：教学与演示层
 
-- `ShaderProgram`
-- `VertexArray`
-- `VertexBuffer`
-- `IndexBuffer`
-- `Texture2D`
-- `Texture3D`
-- `Framebuffer`
+- Bohr
+- 氢样解析轨道
+- `Z_eff + Slater`
+- 演示脚本与说明性动画
 
-### Scene Passes
+标签要求：
 
-- Opaque scene pass
-  - nucleus mesh
-  - orbit rings
-  - energy-level markers
-- Transparent point-cloud pass
-  - phase-colored points using per-vertex position, density, and phase
-- Transparent volume-slice pass
-  - 3D density/phase texture sampled by stacked slices
-- Overlay pass
-  - optional axis/grid helpers
+- `pedagogical`
+- `illustrative`
+- `not a research-grade result`
 
-### Performance Strategy
+### Tier 1：改进中心场层
 
-- No legacy matrix stack or immediate mode calls
-- Cloud/VBO uploads occur only when parameters change
-- Volume textures are rebuilt only on cache invalidation
-- Runtime performance panel reports FPS, frame time, point count, acceptance ratio, and cache sizes
+- 当前已部分具备：径向中心势数值求解
+- 后续可接有效势、改进边界条件、更多验证
 
-## UI Information Architecture
+### Tier 2：自洽平均场层
 
-### Scene
+- 仅预留接口
+- 目标：Hartree / Hartree-Fock / Dirac-Fock
 
-- 3D viewport
-- Mouse orbit, pan, dolly
-- Rendering mode toggles
-- Screenshot-ready clean viewport
+### Tier 3：谱学修正层
 
-### Inspector
+- 仅预留接口与标签规范
+- 目标：fine、hyperfine、Zeeman、Stark
 
-- Element and charge state
-- Mode selection: Bohr / Wave-Particle / Schrödinger Cloud / Compare
-- Quantum numbers and transition selection
-- Approximation toggle: strict hydrogenic vs multi-electron approximate
-- Sampling density, threshold, slice resolution, and LOD controls
+### Tier 4：多电子关联层
 
-### Physics
+- 仅预留接口与路线
+- 目标：CI、MCSCF 风格基组方法
 
-- Current constants and units
-- Energy, radius, velocity, `Z_eff`, transition outputs, normalization error
-- Explicit warning banner for approximate multi-electron mode
+### Tier 5：真实动力学层
 
-### Plots
+- 仅预留接口与表述规则
+- 只有这一层的动画才允许称为真实时间依赖量子动力学
 
-- Energy level diagram
-- Spectrum lines
-- Radial probability distribution `P(r)`
-- Sampling-error plot
-- Numerical-solver convergence plot
+## 8. UI 信息架构
 
-### Performance
+- `Scene`
+  - 3D 场景
+  - 相机交互
+  - 场景状态覆盖层
+- `Inspector`
+  - 元素、荷态、模型、量子数、采样、求解器、演示脚本
+- `Physics`
+  - 当前数值、单位、选择规则、近似警告、方法标签
+- `Plots`
+  - 能级图、谱线图、径向分布、收敛曲线
+- `Performance`
+  - FPS、CPU/GPU 时间、LOD、点数、显存、后台任务状态
+- `Help`
+  - 操作、概念说明、动画分类、脚本控制
+- `Log`
+  - 运行与验证日志
 
-- FPS
-- CPU frame time
-- Sample count / accepted count
-- Cloud regeneration time
-- Volume build time
+## 9. 资源定位策略
 
-### Help
+- 首先尝试基于可执行文件路径回溯项目根目录
+- 再回退到当前工作目录
+- 根目录识别标记：
+  - `xmake.lua`
+  - `assets/data/elements.json`
 
-- Concepts and formulas
-- Shortcut reference
-- Demo-scenario launcher
+资源缺失处理：
 
-### Log
+- 元素数据库读取失败时回退内置轻元素子集
+- 参考 CSV / 演示脚本失败时输出明确日志
 
-- Load/build/runtime issues
-- Validation messages
-- Scenario execution notes
+## 10. 近期升级路线
 
-## Physics Model Hierarchy
+### Must
 
-### Strict Hydrogenic Mode
+- 保持 `xmake` 构建和 Windows x64 可执行交付
+- 继续补方法标签和验证元数据落地
+- 扩展元素数据和参考数据库映射
 
-Applies to:
+### Should
 
-- H
-- Hydrogen-like ions such as `He+`, `Li2+`, `Ne9+`
+- 把谱线/状态/配置结果逐步迁到带 `MethodStamp` 的记录对象
+- 引入更系统的验证报告输出
+- 逐步隔离 legacy `src/` 原型代码
 
-Models:
+### Could
 
-- Reduced-mass corrected Bohr metrics
-- Analytical hydrogenic wavefunctions `psi = R_nl(r) Y_lm(theta, phi)`
-- Dipole transition filter with at least `Delta l = +-1`
-- Numerical radial solver against Coulomb potential
-
-Validation targets:
-
-- `E_n ~ -Z^2 / n^2`
-- `r_n ~ n^2 / Z`
-- Canonical lines such as Lyman-alpha and Balmer-alpha
-
-### Multi-Electron Approximate Teaching Mode
-
-Applies to:
-
-- Neutral or weakly ionized multi-electron atoms such as Ne
-
-Models:
-
-- Aufbau filling order
-- Pauli occupancy limits
-- Hund-guided same-subshell filling summary
-- Configurable exception whitelist
-- Slater shielding `sigma`
-- Effective charge `Z_eff = Z - sigma`
-- Hydrogenic-like orbital radius/energy estimates using `Z -> Z_eff`
-
-UI treatment:
-
-- Always labeled as approximation
-- Scope and limitations shown directly in Physics and Help panels
-
-## Numerical Solver Strategy
-
-`SchrodingerNumericalSolver` solves the radial equation for Coulomb or effective central potentials.
-
-Planned implementation:
-
-- Numerov shooting for bound-state search
-- Node counting for bracket selection
-- Normalization of `u(r)` and conversion to `R(r)`
-- Convergence report versus radial grid step
-
-Outputs:
-
-- Eigenenergy
-- Radial wavefunction samples
-- Error versus analytical hydrogenic energy
-- Cached curves for ImPlot
-
-## Verification and Testing
-
-Automated tests cover:
-
-- CODATA constant conversions
-- Hydrogenic energy and wavelength calculations
-- Electron-configuration formatting
-- Slater-rule `sigma` / `Z_eff` sanity checks
-- Approximate wavefunction normalization and orthogonality checks
-- Numerical solver convergence for hydrogen-like ions
-
-Documentation deliverables live under `docs/`:
-
-- `physics-model.md`
-- `validation.md`
-- `performance.md`
-
-## Milestones
-
-### M1
-
-- xmake modernization
-- GLFW + GLAD + ImGui/ImPlot shell
-- Docking layout
-- Scene framebuffer, camera, and shader-based rendering skeleton
-
-### M2
-
-- SI-based Bohr model
-- Hydrogen-like scaling with reduced mass
-- Transition selection and spectrum plot
-- Element data, electron configuration, Slater rules
-
-### M3
-
-- Complex hydrogenic wavefunction
-- Superposition normalization
-- Cached point-cloud generation
-- Phase rendering and volume slices
-
-### M4
-
-- Numerical radial solver
-- Convergence plots
-- Analytical-vs-numerical validation tools
-
-### M5
-
-- Documentation, reports, tests, and curated demo scenarios for H, He+, and Ne
+- Tier 1 有效势增强
+- Tier 2 自洽平均场原型
+- Tier 3 谱学修正插件化

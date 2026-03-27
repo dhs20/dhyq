@@ -1,4 +1,13 @@
 {
+  "schema_version": 2,
+  "source": {
+    "id": "demo-scenes",
+    "title": "Built-in scene presets",
+    "provider": "embedded",
+    "revision": "2",
+    "license": "",
+    "url": "assets/scenarios/demo_scenes.json"
+  },
   "scenes": [
     {
       "name": "Hydrogen Lyman/Balmer",
@@ -9,7 +18,28 @@
       "transition": { "initial": [2, 1, 0], "final": [1, 0, 0] },
       "components": [
         { "qn": [2, 1, 0], "amplitude": 1.0, "phase": 0.0 }
-      ]
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "strict hydrogenic teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Preset configures a pedagogical visualization, not a new physics solver.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": false,
+        "includes_external_field": false,
+        "is_time_dependent": false,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-h-lyman-balmer",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "Pedagogical hydrogen transition comparison preset."
+      }
     },
     {
       "name": "Helium Ion 3d",
@@ -20,7 +50,28 @@
       "transition": { "initial": [3, 2, 0], "final": [2, 1, 0] },
       "components": [
         { "qn": [3, 2, 0], "amplitude": 1.0, "phase": 0.0 }
-      ]
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "strict hydrogenic teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Preset configures a pedagogical visualization, not a new physics solver.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": false,
+        "includes_external_field": false,
+        "is_time_dependent": false,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-heplus-3d",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "Hydrogen-like ion phase-cloud preset."
+      }
     },
     {
       "name": "Ne Approximate 2p Superposition",
@@ -32,7 +83,28 @@
       "components": [
         { "qn": [2, 1, 0], "amplitude": 0.8, "phase": 0.0 },
         { "qn": [2, 1, 1], "amplitude": 0.6, "phase": 1.57 }
-      ]
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "multi-electron teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Preset configures a pedagogical visualization, not a new physics solver.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": false,
+        "includes_external_field": false,
+        "is_time_dependent": false,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-ne-approx-2p",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "Teaching approximation preset for multi-electron visualization."
+      }
     }
   ]
 }

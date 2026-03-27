@@ -32,6 +32,15 @@ Latest local run:
 All tests passed.
 ```
 
+## Runtime Report Export
+
+The application can export the current runtime validation snapshot to:
+
+- `docs/reports/latest-validation-report.md`
+- `docs/reports/latest-validation-report.json`
+
+The exported report includes active methods, approximation warnings, and validation records for the current UI state.
+
 ## Numerical Solver Status
 
 The current solver path is a true finite-difference tridiagonal eigen solve for hydrogenic validation mode.
@@ -42,3 +51,9 @@ The UI plots convergence as:
 - versus absolute energy error
 
 This closes the earlier gap where the numerical path depended on an analytical fallback.
+
+## Reference-Data Scope
+
+Current spectrum comparison in the application uses a local example CSV file under `assets/data/`.
+
+This is useful for UI-side spot checks and demonstration, but it is not a full NIST ASD mirror or complete external-database integration.

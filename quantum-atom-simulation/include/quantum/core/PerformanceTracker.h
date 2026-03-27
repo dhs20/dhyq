@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <deque>
+#include <vector>
 
 namespace quantum::core {
 
@@ -37,6 +38,7 @@ struct PerformanceSnapshot {
     std::size_t volumeTextureBytes = 0;
     std::size_t framebufferBytes = 0;
     std::size_t trackedGpuBytes = 0;
+    std::vector<float> frameHistoryMs;
 };
 
 class PerformanceTracker {

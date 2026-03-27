@@ -18,8 +18,7 @@ std::filesystem::path detectProjectRoot(const std::filesystem::path& seed) {
 
     for (auto current = candidate; !current.empty(); current = current.parent_path()) {
         const auto assetMarker = current / "assets" / "data" / "elements.json";
-        const auto buildMarker = current / "xmake.lua";
-        if (std::filesystem::exists(assetMarker) && std::filesystem::exists(buildMarker)) {
+        if (std::filesystem::exists(assetMarker)) {
             return current;
         }
         const auto parent = current.parent_path();
