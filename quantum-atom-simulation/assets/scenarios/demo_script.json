@@ -1,0 +1,91 @@
+{
+  "script_name": "默认自动演示",
+  "version": 1,
+  "steps": [
+    {
+      "name": "氢原子玻尔轨道",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "approximation": "strict_hydrogenic",
+      "model": "bohr",
+      "cloud_render_mode": "point_cloud",
+      "solver_qn": [2, 1, 0],
+      "components": [
+        { "qn": [2, 1, 0], "amplitude": 1.0, "phase": 0.0 }
+      ],
+      "use_numerical_radial": false,
+      "build_volume": false,
+      "principal_n": 2,
+      "max_spectrum_n": 6,
+      "transition": {
+        "initial": [2, 1, 0],
+        "final": [1, 0, 0],
+        "enforce_rules": true,
+        "enforce_delta_m": false
+      },
+      "camera": {
+        "yaw": 0.2,
+        "pitch": 0.45,
+        "distance": 10.0,
+        "target": [0.0, 0.2, 0.0]
+      }
+    },
+    {
+      "name": "氦离子相位云",
+      "atomic_number": 2,
+      "charge_state": 1,
+      "approximation": "strict_hydrogenic",
+      "model": "schrodinger_cloud",
+      "cloud_render_mode": "hybrid",
+      "solver_qn": [3, 2, 0],
+      "components": [
+        { "qn": [3, 2, 0], "amplitude": 1.0, "phase": 0.0 }
+      ],
+      "use_numerical_radial": true,
+      "build_volume": true,
+      "principal_n": 3,
+      "max_spectrum_n": 7,
+      "transition": {
+        "initial": [3, 2, 0],
+        "final": [2, 1, 0],
+        "enforce_rules": true,
+        "enforce_delta_m": false
+      },
+      "camera": {
+        "yaw": 1.15,
+        "pitch": 0.6,
+        "distance": 14.0,
+        "target": [0.0, 0.6, 0.0]
+      }
+    },
+    {
+      "name": "氖原子多电子近似",
+      "atomic_number": 10,
+      "charge_state": 0,
+      "approximation": "multi_electron_approximation",
+      "model": "compare",
+      "cloud_render_mode": "hybrid",
+      "solver_qn": [2, 1, 0],
+      "components": [
+        { "qn": [2, 1, 0], "amplitude": 0.8, "phase": 0.0 },
+        { "qn": [2, 1, 1], "amplitude": 0.6, "phase": 1.57 }
+      ],
+      "use_numerical_radial": false,
+      "build_volume": true,
+      "principal_n": 2,
+      "max_spectrum_n": 6,
+      "transition": {
+        "initial": [3, 1, 0],
+        "final": [2, 0, 0],
+        "enforce_rules": true,
+        "enforce_delta_m": false
+      },
+      "camera": {
+        "yaw": -0.75,
+        "pitch": 0.4,
+        "distance": 16.0,
+        "target": [0.0, 0.3, 0.0]
+      }
+    }
+  ]
+}

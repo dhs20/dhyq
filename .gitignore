@@ -1,0 +1,13 @@
+.vs/
+.xmake-global/
+.xmake-pkg-cache/
+.xmake-pkg-install/
+**/.xmake/
+**/build/
+**/logs/
+*.exe
+*.obj
+*.obj.d
+*.log
+imgui.ini
+CppProperties.json
