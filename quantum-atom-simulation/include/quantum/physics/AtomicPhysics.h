@@ -1,5 +1,7 @@
 #pragma once
 
+#include "quantum/meta/MethodMetadata.h"
+
 #include <complex>
 #include <string>
 #include <utility>
@@ -11,7 +13,11 @@ struct ElementRecord {
     int atomicNumber = 1;
     std::string symbol;
     std::string name;
+    std::string localizedNameZh;
     double atomicMassU = 1.0;
+    quantum::meta::MethodStamp method;
+    quantum::meta::SourceRecord source;
+    quantum::meta::ProvenanceRecord provenance;
 };
 
 struct QuantumNumbers {
@@ -38,6 +44,8 @@ struct HydrogenicMetrics {
     double orbitalSpeedMps = 0.0;
     double zeff = 1.0;
     double reducedMassFactor = 1.0;
+    quantum::meta::MethodStamp method;
+    std::vector<quantum::meta::ValidationRecord> validation;
 };
 
 struct TransitionRequest {
@@ -61,6 +69,8 @@ struct TransitionResult {
     double wavelengthM = 0.0;
     double wavelengthNm = 0.0;
     std::string seriesName;
+    quantum::meta::MethodStamp method;
+    std::vector<quantum::meta::ValidationRecord> validation;
 };
 
 struct SpectrumLine {
@@ -70,6 +80,10 @@ struct SpectrumLine {
     double wavelengthNm = 0.0;
     double photonEnergyEv = 0.0;
     std::string seriesName;
+    quantum::meta::MethodStamp method;
+    std::vector<quantum::meta::ValidationRecord> validation;
+    quantum::meta::SourceRecord source;
+    quantum::meta::ProvenanceRecord provenance;
 };
 
 struct SubshellOccupancy {
@@ -84,12 +98,16 @@ struct ElectronConfigurationResult {
     std::string notation;
     bool usedExceptionRule = false;
     std::string exceptionLabel;
+    quantum::meta::MethodStamp method;
+    std::vector<quantum::meta::ValidationRecord> validation;
 };
 
 struct SlaterResult {
     std::string targetLabel;
     double shieldingSigma = 0.0;
     double zeff = 1.0;
+    quantum::meta::MethodStamp method;
+    std::vector<quantum::meta::ValidationRecord> validation;
 };
 
 struct SuperpositionComponent {
@@ -108,6 +126,10 @@ struct ComplexWaveSample {
 struct EnergyLevelSample {
     int n = 1;
     double energyEv = 0.0;
+    quantum::meta::MethodStamp method;
+    quantum::meta::ValidationRecord validation;
+    quantum::meta::SourceRecord source;
+    quantum::meta::ProvenanceRecord provenance;
 };
 
 namespace constants {

@@ -17,4 +17,8 @@ std::filesystem::path Paths::docs(const std::string& relative) const {
     return projectRoot_ / "docs" / relative;
 }
 
+std::filesystem::path Paths::report(const std::string& relative) const {
+    return projectRoot_ / "docs" / "reports" / relative;
+}
+
 } // namespace quantum::core

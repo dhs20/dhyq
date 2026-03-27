@@ -4,12 +4,14 @@
 #include "quantum/core/Logger.h"
 #include "quantum/core/Paths.h"
 #include "quantum/core/PerformanceTracker.h"
+#include "quantum/meta/MethodMetadata.h"
 #include "quantum/physics/CloudGenerator.h"
 #include "quantum/physics/ElementDatabase.h"
 #include "quantum/physics/NumericalSolver.h"
 #include "quantum/render/Camera.h"
 #include "quantum/render/SceneRenderer.h"
 #include "quantum/ui/AppUi.h"
+#include "quantum/validation/ValidationReportWriter.h"
 
 #ifndef GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_NONE
@@ -43,6 +45,9 @@ struct DemoScriptStep {
     int maxSpectrumN = 6;
     TransitionSelection transition;
     quantum::render::OrbitCamera::Pose cameraPose;
+    quantum::meta::MethodStamp method;
+    quantum::meta::SourceRecord source;
+    quantum::meta::ProvenanceRecord provenance;
 };
 
 class Application {
@@ -81,6 +86,9 @@ private:
     void shutdown();
     void recomputeDerived();
     void processDemoScriptRequests();
+    void processReportRequests();
+    [[nodiscard]] std::filesystem::path resolveReportingPath(const std::string& configuredPath) const;
+    [[nodiscard]] std::vector<std::filesystem::path> exportCurrentPlotWindowCsv(const std::filesystem::path& outputPath);
     void startCloudBuild();
     [[nodiscard]] CloudBuildInput makeCloudBuildInput(CloudBuildStage stage) const;
     [[nodiscard]] CloudBuildInput makePreviewCloudBuildInput(const CloudBuildInput& fullInput) const;
@@ -90,6 +98,7 @@ private:
     void applyCloudBuildResult(CloudBuildOutput&& result);
     void loadReferenceLines();
     void processSceneCameraInput(const quantum::ui::UiFrameResult& uiFrame);
+    void fitCameraToScene(quantum::app::SceneFitMode mode, bool immediate);
     void loadDefaultDemoScript();
     bool loadDemoScriptFromFile(const std::filesystem::path& scriptPath);
     bool saveDemoScriptToFile(const std::filesystem::path& scriptPath,
@@ -99,8 +108,11 @@ private:
     void updateAutoDemo(double deltaSeconds);
     void applyDemoStep(std::size_t stepIndex, bool immediateCamera);
     [[nodiscard]] const std::vector<DemoScriptStep>& currentDemoSteps() const;
+    [[nodiscard]] const DemoScriptStep* currentDemoStep() const;
     [[nodiscard]] std::uint64_t cloudRequestSignature(const quantum::physics::CloudRequest& request,
                                                       CloudBuildStage stage) const;
+    void refreshMethodAndValidationMetadata();
+    [[nodiscard]] quantum::validation::ValidationReportInput makeValidationReportInput() const;
 
     std::filesystem::path projectRoot_;
     GLFWwindow* window_ = nullptr;
@@ -113,6 +125,7 @@ private:
     quantum::render::OrbitCamera camera_;
     quantum::render::SceneRenderer sceneRenderer_;
     quantum::ui::AppUi appUi_;
+    quantum::validation::ValidationReportWriter validationReportWriter_;
     SimulationState state_;
     std::future<CloudBuildOutput> cloudBuildFuture_;
     std::optional<CloudBuildInput> queuedCloudBuild_;

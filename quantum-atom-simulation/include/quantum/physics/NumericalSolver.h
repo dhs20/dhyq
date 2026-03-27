@@ -1,6 +1,8 @@
 #pragma once
 
+#include "quantum/meta/MethodMetadata.h"
 #include "quantum/physics/AtomicPhysics.h"
+#include "quantum/physics/CentralField.h"
 
 #include <string>
 #include <utility>
@@ -13,6 +15,7 @@ struct NumericalConvergenceSample {
     double gridStepMeters = 0.0;
     double energyEv = 0.0;
     double errorEv = 0.0;
+    quantum::meta::ValidationRecord validation;
 };
 
 struct NumericalSolverRequest {
@@ -20,6 +23,7 @@ struct NumericalSolverRequest {
     double zeff = 1.0;
     double nuclearMassKg = 0.0;
     bool useReducedMass = true;
+    CentralFieldParameters centralField;
     QuantumNumbers qn;
     int gridPoints = 4096;
     int convergencePasses = 5;
@@ -36,6 +40,9 @@ struct NumericalSolverResult {
     std::vector<double> radialFunction;
     std::vector<std::pair<double, double>> radialDistribution;
     std::vector<NumericalConvergenceSample> convergence;
+    CentralFieldProfile centralFieldProfile;
+    quantum::meta::MethodStamp method;
+    std::vector<quantum::meta::ValidationRecord> validation;
 };
 
 class SchrodingerNumericalSolver {

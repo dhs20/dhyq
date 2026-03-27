@@ -119,6 +119,10 @@ PerformanceSnapshot PerformanceTracker::snapshot() const {
     snapshot.volumeTextureBytes = volumeTextureBytes_;
     snapshot.framebufferBytes = framebufferBytes_;
     snapshot.trackedGpuBytes = pointBufferBytes_ + volumeTextureBytes_ + framebufferBytes_;
+    snapshot.frameHistoryMs.reserve(frameHistoryMs_.size());
+    for (const double frameMs : frameHistoryMs_) {
+        snapshot.frameHistoryMs.push_back(static_cast<float>(frameMs));
+    }
     if (!frameHistoryMs_.empty()) {
         double sum = 0.0;
         for (const double frameMs : frameHistoryMs_) {

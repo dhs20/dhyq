@@ -1,0 +1,36 @@
+name: windows-xmake
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - "codex/**"
+      - "feature/**"
+  pull_request:
+
+jobs:
+  build-test-smoke:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: quantum-atom-simulation
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: latest
+
+      - name: Build
+        run: .\scripts\build.ps1 -Configuration Release
+
+      - name: Run tests
+        run: .\build\windows\x64\release\quantum_atom_tests.exe
+
+      - name: Smoke test
+        run: .\scripts\smoke_test.ps1 -Configuration Release

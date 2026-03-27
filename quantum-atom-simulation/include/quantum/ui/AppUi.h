@@ -15,6 +15,8 @@ struct UiFrameResult {
     bool sceneHovered = false;
     bool sceneActive = false;
     bool sceneFocused = false;
+    bool fitSceneRequested = false;
+    quantum::app::SceneFitMode fitSceneMode = quantum::app::SceneFitMode::Full;
 };
 
 class AppUi {
@@ -32,6 +34,7 @@ private:
     mutable int spectrumSelectionIndex_ = -1;
     mutable bool spectrumSelectionReference_ = false;
     mutable int radialSelectionIndex_ = -1;
+    mutable int centralFieldSelectionIndex_ = -1;
     mutable int convergenceSelectionIndex_ = -1;
 };
 

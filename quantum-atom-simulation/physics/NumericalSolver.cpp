@@ -9,6 +9,53 @@
 namespace quantum::physics {
 namespace {
 
+using quantum::meta::AnimationKind;
+using quantum::meta::MethodStamp;
+using quantum::meta::ModelTier;
+using quantum::meta::SourceRecord;
+using quantum::meta::ValidationRecord;
+using quantum::meta::ValidationStatus;
+
+SourceRecord numericalBenchmarkSource() {
+    return {"internal-numerical-benchmark", "Internal numerical hydrogenic benchmark", "quantum_atom_tests", "1", "", ""};
+}
+
+MethodStamp makeSolverMethodStamp() {
+    MethodStamp stamp;
+    stamp.methodName = "Finite-difference radial central-field eigen solver";
+    stamp.approximation = "single-electron radial central-field solver on a uniform grid";
+    stamp.dataSource = "Discretized radial Hamiltonian with configurable central potential";
+    stamp.validationSummary =
+        "Hydrogenic Coulomb mode is benchmarked against analytic energies; screened mode is a qualitative Tier 1 extension.";
+    stamp.tier = ModelTier::Tier1CentralField;
+    stamp.animationKind = AnimationKind::None;
+    stamp.caveats.push_back("Only radial central-potential problems are solved.");
+    stamp.caveats.push_back("This is not a many-electron self-consistent-field or correlated solver.");
+    stamp.caveats.push_back("Screened central-field mode is phenomenological and intended for qualitative trends.");
+    return stamp;
+}
+
+ValidationRecord makeEnergyValidation(const std::string& caseName,
+                                      double referenceValue,
+                                      double measuredValue,
+                                      double tolerance,
+                                      const std::string& notes = {}) {
+    ValidationRecord record;
+    record.status = (std::abs(measuredValue - referenceValue) <= tolerance) ? ValidationStatus::ReferenceMatched
+                                                                             : ValidationStatus::SanityChecked;
+    record.caseName = caseName;
+    record.referenceName = "Hydrogenic analytic energy";
+    record.units = "eV";
+    record.referenceValue = referenceValue;
+    record.measuredValue = measuredValue;
+    record.absoluteError = std::abs(measuredValue - referenceValue);
+    record.relativeError =
+        (std::abs(referenceValue) > 1.0e-30) ? (record.absoluteError / std::abs(referenceValue)) : 0.0;
+    record.notes = notes;
+    record.source = numericalBenchmarkSource();
+    return record;
+}
+
 double reducedMassFactorForSolver(double nuclearMassKg, bool useReducedMass) {
     if (!useReducedMass || nuclearMassKg <= 0.0) {
         return 1.0;
@@ -21,28 +68,30 @@ double reducedMassFactorForSolver(double nuclearMassKg, bool useReducedMass) {
 struct TridiagonalSystem {
     std::vector<double> diagonal;
     std::vector<double> offDiagonal;
-    std::vector<double> radiiScaled;
-    double stepScaled = 0.0;
+    std::vector<double> radiiBohr;
+    double stepBohr = 0.0;
 };
 
-TridiagonalSystem buildHydrogenicSystem(const NumericalSolverRequest& request, int gridPoints) {
+TridiagonalSystem buildCentralFieldSystem(const NumericalSolverRequest& request, int gridPoints) {
     TridiagonalSystem system;
     system.diagonal.resize(static_cast<std::size_t>(gridPoints));
     system.offDiagonal.assign(static_cast<std::size_t>(std::max(0, gridPoints - 1)), 0.0);
-    system.radiiScaled.resize(static_cast<std::size_t>(gridPoints));
+    system.radiiBohr.resize(static_cast<std::size_t>(gridPoints));
 
-    const double maxRadiusScaled = request.maxScaledRadius;
-    system.stepScaled = maxRadiusScaled / static_cast<double>(gridPoints + 1);
-    const double invH2 = 1.0 / (system.stepScaled * system.stepScaled);
-    const double off = -0.5 * invH2;
+    const double maxRadiusBohr = std::max(request.maxScaledRadius, 5.0);
+    system.stepBohr = maxRadiusBohr / static_cast<double>(gridPoints + 1);
+    const double invH2 = 1.0 / (system.stepBohr * system.stepBohr);
+    const double muFactor = reducedMassFactorForSolver(request.nuclearMassKg, request.useReducedMass);
+    const double kineticPrefactor = 1.0 / (2.0 * muFactor);
+    const double off = -kineticPrefactor * invH2;
 
     for (int index = 0; index < gridPoints; ++index) {
-        const double radius = system.stepScaled * static_cast<double>(index + 1);
-        system.radiiScaled[static_cast<std::size_t>(index)] = radius;
+        const double radiusBohr = system.stepBohr * static_cast<double>(index + 1);
+        system.radiiBohr[static_cast<std::size_t>(index)] = radiusBohr;
         const double centrifugal =
-            static_cast<double>(request.qn.l * (request.qn.l + 1)) / (2.0 * radius * radius);
-        const double coulomb = -1.0 / radius;
-        system.diagonal[static_cast<std::size_t>(index)] = invH2 + centrifugal + coulomb;
+            kineticPrefactor * static_cast<double>(request.qn.l * (request.qn.l + 1)) / (radiusBohr * radiusBohr);
+        const double potential = centralPotentialHartree(request.centralField, radiusBohr);
+        system.diagonal[static_cast<std::size_t>(index)] = (2.0 * kineticPrefactor * invH2) + centrifugal + potential;
         if (index < gridPoints - 1) {
             system.offDiagonal[static_cast<std::size_t>(index)] = off;
         }
@@ -189,19 +238,14 @@ SingleSolveResult solveSingle(const NumericalSolverRequest& request, int gridPoi
         return result;
     }
 
-    const double muFactor = reducedMassFactorForSolver(request.nuclearMassKg, request.useReducedMass);
-    const double effectiveBohrRadius =
-        constants::bohrRadiusM * (1.0 / muFactor) / std::max(request.zeff, 1e-6);
+    const auto system = buildCentralFieldSystem(request, gridPoints);
+    const double energyHartree = bisectEigenvalue(system, radialStateIndex);
+    const auto eigenvector = inverseIterationEigenvector(system, energyHartree);
 
-    const auto system = buildHydrogenicSystem(request, gridPoints);
-    const double eigenvalueScaledHartree = bisectEigenvalue(system, radialStateIndex);
-    const auto eigenvector = inverseIterationEigenvector(system, eigenvalueScaledHartree);
-
-    const double energyHartree = eigenvalueScaledHartree * muFactor * request.zeff * request.zeff;
     const double energyJ = energyHartree * 2.0 * constants::rydbergEnergyJ;
     result.energyEv = units::jouleToEv(energyJ);
     result.errorEv = std::abs(result.energyEv - result.analyticalEnergyEv);
-    result.gridStepMeters = system.stepScaled * effectiveBohrRadius;
+    result.gridStepMeters = system.stepBohr * constants::bohrRadiusM;
 
     double norm = 0.0;
     for (const double value : eigenvector) {
@@ -213,7 +257,7 @@ SingleSolveResult solveSingle(const NumericalSolverRequest& request, int gridPoi
     result.radialFunction.reserve(eigenvector.size());
     result.radialDistribution.reserve(eigenvector.size());
     for (std::size_t index = 0; index < eigenvector.size(); ++index) {
-        const double radius = system.radiiScaled[index] * effectiveBohrRadius;
+        const double radius = system.radiiBohr[index] * constants::bohrRadiusM;
         const double u = eigenvector[index] / norm;
         const double radial = u / std::max(radius, 1e-20);
         result.radiiMeters.push_back(radius);
@@ -222,7 +266,9 @@ SingleSolveResult solveSingle(const NumericalSolverRequest& request, int gridPoi
     }
 
     result.converged = true;
-    result.message = "有限差分三对角本征求解已收敛";
+    result.message = (request.centralField.mode == CentralFieldMode::ScreenedCentralField)
+                         ? "有限差分中心场本征求解已收敛"
+                         : "有限差分库仑本征求解已收敛";
     return result;
 }
 
@@ -230,10 +276,14 @@ SingleSolveResult solveSingle(const NumericalSolverRequest& request, int gridPoi
 
 NumericalSolverResult SchrodingerNumericalSolver::solve(const NumericalSolverRequest& request) const {
     NumericalSolverResult result;
+    result.method = makeSolverMethodStamp();
     if (request.qn.n <= 0 || request.qn.l < 0 || request.qn.l >= request.qn.n) {
         result.message = "量子数无效";
         return result;
     }
+
+    result.centralFieldProfile =
+        sampleCentralFieldProfile(request.centralField, request.maxScaledRadius, 160);
 
     const auto base = solveSingle(request, request.gridPoints);
     result.converged = base.converged;
@@ -244,6 +294,14 @@ NumericalSolverResult SchrodingerNumericalSolver::solve(const NumericalSolverReq
     result.radiiMeters = base.radiiMeters;
     result.radialFunction = base.radialFunction;
     result.radialDistribution = base.radialDistribution;
+    result.validation.insert(result.validation.end(),
+                             result.centralFieldProfile.validation.begin(),
+                             result.centralFieldProfile.validation.end());
+    result.validation.push_back(makeEnergyValidation("Numerical eigen solve",
+                                                     result.analyticalEnergyEv,
+                                                     result.energyEv,
+                                                     0.2,
+                                                     "Primary solver result compared against the analytic hydrogenic value."));
 
     if (!base.converged) {
         return result;
@@ -254,7 +312,17 @@ NumericalSolverResult SchrodingerNumericalSolver::solve(const NumericalSolverReq
         const int gridPoints = std::max(128, request.gridPoints / divisor);
         const auto sample = solveSingle(request, gridPoints);
         if (sample.converged) {
-            result.convergence.push_back({gridPoints, sample.gridStepMeters, sample.energyEv, sample.errorEv});
+            NumericalConvergenceSample convergenceSample;
+            convergenceSample.gridPoints = gridPoints;
+            convergenceSample.gridStepMeters = sample.gridStepMeters;
+            convergenceSample.energyEv = sample.energyEv;
+            convergenceSample.errorEv = sample.errorEv;
+            convergenceSample.validation = makeEnergyValidation("Grid refinement sample",
+                                                                sample.analyticalEnergyEv,
+                                                                sample.energyEv,
+                                                                0.3,
+                                                                "Convergence sample for the finite-difference radial solver.");
+            result.convergence.push_back(std::move(convergenceSample));
         }
     }
 

@@ -32,7 +32,7 @@ void OrbitCamera::pan(const glm::vec2& delta) {
 }
 
 void OrbitCamera::dolly(float delta) {
-    current_.distance = std::clamp(current_.distance * std::exp(-delta * 0.1f), 1.0f, 120.0f);
+    current_.distance = std::clamp(current_.distance * std::exp(-delta * 0.1f), minDistance_, maxDistance_);
     target_ = current_;
     transitioning_ = false;
 }
@@ -42,7 +42,8 @@ void OrbitCamera::update(float deltaTimeSeconds) {
         return;
     }
 
-    const float response = 1.0f - std::exp(-std::max(deltaTimeSeconds, 0.0f) * 8.0f);
+    const float effectiveDuration = std::max(transitionDurationSeconds_, 0.02f);
+    const float response = 1.0f - std::exp(-std::max(deltaTimeSeconds, 0.0f) * (4.0f / effectiveDuration));
     current_.yaw += (target_.yaw - current_.yaw) * response;
     current_.pitch += (target_.pitch - current_.pitch) * response;
     current_.distance += (target_.distance - current_.distance) * response;
@@ -60,15 +61,35 @@ void OrbitCamera::update(float deltaTimeSeconds) {
 
 void OrbitCamera::jumpToPose(const Pose& pose) {
     current_ = pose;
+    current_.pitch = std::clamp(current_.pitch, -1.3f, 1.3f);
+    current_.distance = std::clamp(current_.distance, minDistance_, maxDistance_);
     target_ = pose;
+    target_.pitch = current_.pitch;
+    target_.distance = current_.distance;
     transitioning_ = false;
 }
 
 void OrbitCamera::animateToPose(const Pose& pose) {
     target_ = pose;
     target_.pitch = std::clamp(target_.pitch, -1.3f, 1.3f);
-    target_.distance = std::clamp(target_.distance, 1.0f, 120.0f);
+    target_.distance = std::clamp(target_.distance, minDistance_, maxDistance_);
     transitioning_ = true;
+}
+
+void OrbitCamera::setTransitionDuration(float seconds) {
+    transitionDurationSeconds_ = std::clamp(seconds, 0.02f, 5.0f);
+}
+
+void OrbitCamera::setDistanceLimits(float minDistance, float maxDistance) {
+    minDistance_ = std::max(0.05f, minDistance);
+    maxDistance_ = std::max(minDistance_ + 0.05f, maxDistance);
+    current_.distance = std::clamp(current_.distance, minDistance_, maxDistance_);
+    target_.distance = std::clamp(target_.distance, minDistance_, maxDistance_);
+}
+
+void OrbitCamera::setClipPlanes(float nearPlane, float farPlane) {
+    nearPlane_ = std::clamp(nearPlane, 0.001f, 5.0f);
+    farPlane_ = std::max(nearPlane_ + 1.0f, farPlane);
 }
 
 glm::mat4 OrbitCamera::viewMatrix() const {
@@ -76,7 +97,7 @@ glm::mat4 OrbitCamera::viewMatrix() const {
 }
 
 glm::mat4 OrbitCamera::projectionMatrix() const {
-    return glm::perspective(glm::radians(45.0f), aspectRatio(), 0.01f, 500.0f);
+    return glm::perspective(glm::radians(45.0f), aspectRatio(), nearPlane_, farPlane_);
 }
 
 glm::vec3 OrbitCamera::position() const {

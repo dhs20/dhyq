@@ -12,6 +12,7 @@ public:
     [[nodiscard]] const std::filesystem::path& projectRoot() const;
     [[nodiscard]] std::filesystem::path asset(const std::string& relative) const;
     [[nodiscard]] std::filesystem::path docs(const std::string& relative) const;
+    [[nodiscard]] std::filesystem::path report(const std::string& relative) const;
 
 private:
     std::filesystem::path projectRoot_;

@@ -1,15 +1,18 @@
-#include "quantum/app/Application.h"
+﻿#include "quantum/app/Application.h"
 
 #include <GL/glew.h>
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <ctime>
 #include <fstream>
+#include <functional>
 #include <nlohmann/json.hpp>
 #include <sstream>
 
@@ -46,6 +49,38 @@ std::filesystem::path firstExistingPath(std::initializer_list<std::filesystem::p
         }
     }
     return {};
+}
+
+std::string csvField(const std::string& value) {
+    std::string escaped;
+    escaped.reserve(value.size() + 8);
+    escaped.push_back('"');
+    for (const char ch : value) {
+        if (ch == '"') {
+            escaped.push_back('"');
+        }
+        escaped.push_back(ch);
+    }
+    escaped.push_back('"');
+    return escaped;
+}
+
+std::string currentTimestampTag() {
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+    std::tm localTime{};
+#ifdef _WIN32
+    localtime_s(&localTime, &nowTime);
+#else
+    localtime_r(&nowTime, &localTime);
+#endif
+    char buffer[32];
+    std::strftime(buffer, sizeof(buffer), "%Y%m%d_%H%M%S", &localTime);
+    return buffer;
+}
+
+std::filesystem::path appendStemSuffix(const std::filesystem::path& path, const std::string& suffix) {
+    return path.parent_path() / (path.stem().string() + suffix + path.extension().string());
 }
 
 std::filesystem::path detectChineseFontPath() {
@@ -243,6 +278,120 @@ CloudRenderMode parseCloudMode(const std::string& value) {
     return CloudRenderMode::Hybrid;
 }
 
+quantum::meta::SourceRecord sourceRecordFromJson(const nlohmann::json& node) {
+    quantum::meta::SourceRecord source;
+    if (!node.is_object()) {
+        return source;
+    }
+    source.id = node.value("id", std::string{});
+    source.title = node.value("title", std::string{});
+    source.provider = node.value("provider", std::string{});
+    source.revision = node.value("revision", std::string{});
+    source.license = node.value("license", std::string{});
+    source.url = node.value("url", std::string{});
+    return source;
+}
+
+nlohmann::json sourceRecordToJson(const quantum::meta::SourceRecord& source) {
+    return {{"id", source.id},
+            {"title", source.title},
+            {"provider", source.provider},
+            {"revision", source.revision},
+            {"license", source.license},
+            {"url", source.url}};
+}
+
+quantum::meta::ProvenanceRecord provenanceRecordFromJson(const nlohmann::json& node) {
+    quantum::meta::ProvenanceRecord provenance;
+    if (!node.is_object()) {
+        return provenance;
+    }
+    provenance.recordId = node.value("record_id", std::string{});
+    provenance.sourceId = node.value("source_id", std::string{});
+    provenance.createdBy = node.value("created_by", std::string{});
+    provenance.notes = node.value("notes", std::string{});
+    return provenance;
+}
+
+nlohmann::json provenanceRecordToJson(const quantum::meta::ProvenanceRecord& provenance) {
+    return {{"record_id", provenance.recordId},
+            {"source_id", provenance.sourceId},
+            {"created_by", provenance.createdBy},
+            {"notes", provenance.notes}};
+}
+
+quantum::meta::MethodStamp methodStampFromJson(const nlohmann::json& node) {
+    quantum::meta::MethodStamp stamp;
+    if (!node.is_object()) {
+        return stamp;
+    }
+    stamp.methodName = node.value("method_name", std::string{});
+    stamp.approximation = node.value("approximation", std::string{});
+    stamp.dataSource = node.value("data_source", std::string{});
+    stamp.validationSummary = node.value("validation_summary", std::string{});
+    stamp.includesElectronCorrelation = node.value("includes_electron_correlation", false);
+    stamp.enforcesAntisymmetry = node.value("enforces_antisymmetry", false);
+    stamp.includesRelativity = node.value("includes_relativity", false);
+    stamp.includesExternalField = node.value("includes_external_field", false);
+    stamp.isTimeDependent = node.value("is_time_dependent", false);
+    if (node.contains("caveats") && node.at("caveats").is_array()) {
+        stamp.caveats = node.at("caveats").get<std::vector<std::string>>();
+    }
+    return stamp;
+}
+
+nlohmann::json methodStampToJson(const quantum::meta::MethodStamp& stamp) {
+    return {{"method_name", stamp.methodName},
+            {"approximation", stamp.approximation},
+            {"data_source", stamp.dataSource},
+            {"validation_summary", stamp.validationSummary},
+            {"includes_electron_correlation", stamp.includesElectronCorrelation},
+            {"enforces_antisymmetry", stamp.enforcesAntisymmetry},
+            {"includes_relativity", stamp.includesRelativity},
+            {"includes_external_field", stamp.includesExternalField},
+            {"is_time_dependent", stamp.isTimeDependent},
+            {"caveats", stamp.caveats}};
+}
+
+quantum::meta::SourceRecord builtInSceneSource() {
+    return {"demo-scenes",
+            "Built-in scene presets",
+            "embedded",
+            "1",
+            "",
+            "assets/scenarios/demo_scenes.json"};
+}
+
+quantum::meta::MethodStamp scenePresetMethodStamp(quantum::physics::ApproximationMode mode) {
+    quantum::meta::MethodStamp stamp;
+    stamp.methodName = "Scene preset selection";
+    stamp.approximation = (mode == quantum::physics::ApproximationMode::StrictHydrogenic)
+                              ? "strict hydrogenic teaching preset"
+                              : "multi-electron teaching preset";
+    stamp.dataSource = "Built-in scripted scene preset";
+    stamp.validationSummary = "Preset configures a pedagogical visualization, not a new physics solver.";
+    stamp.tier = quantum::meta::ModelTier::Tier0Teaching;
+    stamp.animationKind = quantum::meta::AnimationKind::Illustrative;
+    stamp.caveats.push_back("Scene presets control visualization and parameter defaults.");
+    stamp.caveats.push_back("They do not imply research-grade validation.");
+    return stamp;
+}
+
+std::string localizedStepName(const DemoScriptStep& step) {
+    if (step.atomicNumber == 1 && step.chargeState == 0 && step.modelKind == ModelKind::Bohr) {
+        return "氢原子玻尔轨道";
+    }
+    if (step.atomicNumber == 2 && step.chargeState == 1 &&
+        step.modelKind == ModelKind::SchrodingerCloud) {
+        return "氦离子相位云";
+    }
+    if (step.atomicNumber == 10 &&
+        step.approximationMode == quantum::physics::ApproximationMode::MultiElectronApproximation) {
+        return "氖原子多电子近似";
+    }
+    return step.name;
+}
+
 nlohmann::json quantumNumbersToJson(const quantum::physics::QuantumNumbers& qn) {
     return nlohmann::json::array({qn.n, qn.l, qn.m});
 }
@@ -301,7 +450,10 @@ nlohmann::json demoStepToJson(const DemoScriptStep& step) {
               {"final", quantumNumbersToJson(step.transition.final)},
               {"enforce_rules", step.transition.enforceRules},
               {"enforce_delta_m", step.transition.enforceDeltaM}}},
-            {"camera", poseToJson(step.cameraPose)}};
+            {"camera", poseToJson(step.cameraPose)},
+            {"method", methodStampToJson(step.method)},
+            {"source", sourceRecordToJson(step.source)},
+            {"provenance", provenanceRecordToJson(step.provenance)}};
 }
 
 DemoScriptStep demoStepFromJson(const nlohmann::json& node) {
@@ -341,6 +493,27 @@ DemoScriptStep demoStepFromJson(const nlohmann::json& node) {
     }
     if (node.contains("camera")) {
         step.cameraPose = poseFromJson(node.at("camera"));
+    }
+    if (node.contains("method")) {
+        step.method = methodStampFromJson(node.at("method"));
+    }
+    if (node.contains("source")) {
+        step.source = sourceRecordFromJson(node.at("source"));
+    }
+    if (node.contains("provenance")) {
+        step.provenance = provenanceRecordFromJson(node.at("provenance"));
+    }
+    if (step.method.methodName.empty()) {
+        step.method = scenePresetMethodStamp(step.approximationMode);
+    }
+    if (step.source.id.empty()) {
+        step.source = builtInSceneSource();
+    }
+    if (step.provenance.recordId.empty()) {
+        step.provenance = {"demo-step-" + std::to_string(step.atomicNumber) + "-" + step.name,
+                           step.source.id,
+                           "app::demoStepFromJson",
+                           "Parsed from demo script JSON."};
     }
     return step;
 }
@@ -421,6 +594,10 @@ bool Application::initialize() {
         logger_.info("已从 assets/data/elements.json 加载元素数据库。");
     }
 
+    if (!elementDatabase_.loadReferenceTransitions(paths_.asset("data/nist_reference_lines.csv"))) {
+        logger_.warn("未能加载本地参考谱线映射，谱线对照将不可用。");
+    }
+
     std::string rendererError;
     if (!sceneRenderer_.initialize(rendererError)) {
         logger_.error(rendererError);
@@ -454,12 +631,16 @@ int Application::run() {
 
         sceneRenderer_.resize(static_cast<int>(uiFrame.sceneSize.x), static_cast<int>(uiFrame.sceneSize.y));
         camera_.resize(static_cast<int>(uiFrame.sceneSize.x), static_cast<int>(uiFrame.sceneSize.y));
+        if (uiFrame.fitSceneRequested || (uiFrame.sceneFocused && ImGui::IsKeyPressed(ImGuiKey_F))) {
+            fitCameraToScene(uiFrame.fitSceneRequested ? uiFrame.fitSceneMode : quantum::app::SceneFitMode::Full, false);
+        }
         processSceneCameraInput(uiFrame);
         processDemoScriptRequests();
         updateAutoDemo(deltaSeconds);
         camera_.update(static_cast<float>(deltaSeconds));
 
         recomputeDerived();
+        processReportRequests();
         const auto renderStats = sceneRenderer_.render(state_, camera_);
         performance_.setRenderStats(renderStats.gpuTimersSupported,
                                     renderStats.gpuFrameMs,
@@ -619,6 +800,8 @@ void Application::recomputeDerived() {
         transitionRequest.nuclearMassKg = nuclearMass;
         transitionRequest.useReducedMass = state_.bohr.useReducedMass;
         state_.derived.transition = quantum::physics::computeTransition(transitionRequest);
+        state_.derived.spectroscopy = quantum::spectroscopy::evaluateHydrogenicCorrections(
+            transitionRequest, state_.derived.transition, state_.spectroscopy, nuclearMass);
         state_.derived.spectrumLines = quantum::physics::generateSpectrum(state_.atomicNumber,
                                                                           state_.bohr.maxSpectrumN,
                                                                           state_.derived.activeZeff,
@@ -636,21 +819,47 @@ void Application::recomputeDerived() {
             std::max(5.0e-10, state_.derived.bohrMetrics.orbitalRadiusM * 8.0),
             512,
             state_.bohr.useReducedMass);
+        quantum::physics::CentralFieldParameters centralField;
+        centralField.mode = state_.solver.useScreenedCentralField ? quantum::physics::CentralFieldMode::ScreenedCentralField
+                                                                  : quantum::physics::CentralFieldMode::HydrogenicCoulomb;
+        centralField.nuclearCharge = state_.atomicNumber;
+        centralField.ionCharge = state_.chargeState;
+        centralField.zeff = state_.derived.activeZeff;
+        centralField.autoResidualCharge = state_.solver.autoResidualCharge;
+        centralField.residualCharge = state_.solver.residualCharge;
+        centralField.screeningLengthBohr = state_.solver.screeningLengthBohr;
+        state_.derived.centralField =
+            quantum::physics::sampleCentralFieldProfile(centralField, state_.solver.maxScaledRadius, 160);
 
         state_.dirty.solver = true;
         state_.dirty.cloud = true;
     }
 
     if (state_.dirty.solver) {
-        const auto solverResult = numericalSolver_.solve({state_.atomicNumber,
-                                                          state_.derived.activeZeff,
-                                                          nuclearMass,
-                                                          state_.bohr.useReducedMass,
-                                                          state_.solver.qn,
-                                                          state_.solver.gridPoints,
-                                                          state_.solver.convergencePasses,
-                                                          state_.solver.maxScaledRadius});
+        quantum::physics::CentralFieldParameters centralField;
+        centralField.mode = state_.solver.useScreenedCentralField ? quantum::physics::CentralFieldMode::ScreenedCentralField
+                                                                  : quantum::physics::CentralFieldMode::HydrogenicCoulomb;
+        centralField.nuclearCharge = state_.atomicNumber;
+        centralField.ionCharge = state_.chargeState;
+        centralField.zeff = state_.derived.activeZeff;
+        centralField.autoResidualCharge = state_.solver.autoResidualCharge;
+        centralField.residualCharge = state_.solver.residualCharge;
+        centralField.screeningLengthBohr = state_.solver.screeningLengthBohr;
+
+        quantum::physics::NumericalSolverRequest request;
+        request.nuclearCharge = state_.atomicNumber;
+        request.zeff = state_.derived.activeZeff;
+        request.nuclearMassKg = nuclearMass;
+        request.useReducedMass = state_.bohr.useReducedMass;
+        request.centralField = centralField;
+        request.qn = state_.solver.qn;
+        request.gridPoints = state_.solver.gridPoints;
+        request.convergencePasses = state_.solver.convergencePasses;
+        request.maxScaledRadius = state_.solver.maxScaledRadius;
+
+        const auto solverResult = numericalSolver_.solve(request);
         state_.derived.solver = solverResult;
+        state_.derived.centralField = solverResult.centralFieldProfile;
         if (solverResult.converged && state_.cloud.useNumericalRadial && !state_.cloud.components.empty() &&
             state_.solver.qn.n == state_.cloud.components.front().qn.n &&
             state_.solver.qn.l == state_.cloud.components.front().qn.l) {
@@ -667,6 +876,7 @@ void Application::recomputeDerived() {
         startCloudBuild();
     }
 
+    refreshMethodAndValidationMetadata();
     state_.dirty = {};
 }
 
@@ -706,6 +916,504 @@ void Application::processDemoScriptRequests() {
         saveDemoScriptToFile(resolveScriptPath(), steps, hasRecorded ? "录制脚本" : state_.demo.activeScriptName);
         state_.demo.saveScriptRequested = false;
     }
+}
+
+void Application::processReportRequests() {
+    if (state_.reporting.exportValidationReportRequested) {
+        const std::filesystem::path outputPath = resolveReportingPath(state_.reporting.outputPath);
+        auto reportInput = makeValidationReportInput();
+        reportInput.outputStem = outputPath.stem().string();
+        const auto result = validationReportWriter_.write(reportInput, outputPath);
+        if (result.ok) {
+            state_.reporting.exportStatus =
+                "已导出: " + result.markdownPath.string() + " | " + result.jsonPath.filename().string();
+            logger_.info("已导出验证报告: " + result.markdownPath.string());
+        } else {
+            state_.reporting.exportStatus = "导出失败: " + result.message;
+            logger_.error("导出验证报告失败: " + result.message);
+        }
+        state_.reporting.exportValidationReportRequested = false;
+    }
+
+    if (state_.reporting.exportCurrentPlotCsvRequested) {
+        const std::filesystem::path outputPath = resolveReportingPath(state_.reporting.csvOutputPath);
+        const auto exportedPaths = exportCurrentPlotWindowCsv(outputPath);
+        if (!exportedPaths.empty()) {
+            if (exportedPaths.size() == 1) {
+                state_.reporting.csvExportStatus = "已导出: " + exportedPaths.front().string();
+                logger_.info("已导出当前窗口 CSV: " + exportedPaths.front().string());
+            } else {
+                state_.reporting.csvExportStatus =
+                    "已导出 " + std::to_string(exportedPaths.size()) + " 个 CSV: " + exportedPaths.front().string();
+                logger_.info("已导出当前窗口拆分 CSV，共 " + std::to_string(exportedPaths.size()) + " 个文件。");
+            }
+        } else {
+            state_.reporting.csvExportStatus = "导出失败，请检查路径与日志";
+            logger_.error("导出当前窗口 CSV 失败: " + outputPath.string());
+        }
+        state_.reporting.exportCurrentPlotCsvRequested = false;
+    }
+}
+
+std::filesystem::path Application::resolveReportingPath(const std::string& configuredPath) const {
+    const std::filesystem::path configured(configuredPath);
+    if (configured.is_absolute()) {
+        return configured;
+    }
+    if (configured.parent_path().empty()) {
+        return paths_.report(configured.string());
+    }
+    return projectRoot_ / configured;
+}
+
+std::vector<std::filesystem::path> Application::exportCurrentPlotWindowCsv(const std::filesystem::path& outputPath) {
+    try {
+        const std::filesystem::path baseOutputPath =
+            state_.reporting.csvAppendTimestamp ? appendStemSuffix(outputPath, "_" + currentTimestampTag()) : outputPath;
+        std::filesystem::create_directories(baseOutputPath.parent_path());
+
+        const auto writeCsvFile =
+            [](const std::filesystem::path& path,
+               const std::function<void(std::ofstream&)>& emitRows) -> bool {
+            std::ofstream stream(path, std::ios::binary | std::ios::trunc);
+            if (!stream.is_open()) {
+                return false;
+            }
+            stream << "plot,source,index,label,x,y,extra_1,extra_2,extra_3\n";
+            emitRows(stream);
+            return true;
+        };
+
+        const auto writeRow = [](std::ofstream& stream,
+                                 const std::string& plot,
+                                 const std::string& source,
+                                 std::size_t index,
+                                 const std::string& label,
+                                 double x,
+                                 double y,
+                                 const std::string& extra1 = {},
+                                 const std::string& extra2 = {},
+                                 const std::string& extra3 = {}) {
+            stream << csvField(plot) << ',' << csvField(source) << ',' << index << ',' << csvField(label) << ','
+                   << x << ',' << y << ',' << csvField(extra1) << ',' << csvField(extra2) << ',' << csvField(extra3) << '\n';
+        };
+
+        std::vector<std::filesystem::path> exportedPaths;
+
+        const auto exportSingleFile = [&](const std::filesystem::path& path) -> bool {
+            return writeCsvFile(path, [&](std::ofstream& stream) {
+                for (std::size_t index = 0; index < state_.derived.energyLevels.size(); ++index) {
+                    const auto& level = state_.derived.energyLevels[index];
+                    if (level.energyEv < state_.reporting.energyPlotWindow.minY ||
+                        level.energyEv > state_.reporting.energyPlotWindow.maxY) {
+                        continue;
+                    }
+                    std::string stateTag = "可见";
+                    if (level.n == state_.transition.initial.n) {
+                        stateTag = "初态";
+                    } else if (level.n == state_.transition.final.n) {
+                        stateTag = "末态";
+                    }
+                    writeRow(stream, "能级图", "计算", index, "n=" + std::to_string(level.n), static_cast<double>(level.n), level.energyEv, stateTag);
+                }
+
+                for (std::size_t index = 0; index < state_.derived.spectrumLines.size(); ++index) {
+                    const auto& line = state_.derived.spectrumLines[index];
+                    if (state_.transition.enforceRules && !line.allowed) {
+                        continue;
+                    }
+                    if (line.wavelengthNm < state_.reporting.spectrumPlotWindow.minX ||
+                        line.wavelengthNm > state_.reporting.spectrumPlotWindow.maxX ||
+                        line.photonEnergyEv < state_.reporting.spectrumPlotWindow.minY ||
+                        line.photonEnergyEv > state_.reporting.spectrumPlotWindow.maxY) {
+                        continue;
+                    }
+                    writeRow(stream,
+                             "谱线图",
+                             "计算",
+                             index,
+                             line.seriesName,
+                             line.wavelengthNm,
+                             line.photonEnergyEv,
+                             "(" + std::to_string(line.initial.n) + "," + std::to_string(line.initial.l) + "," +
+                                 std::to_string(line.initial.m) + ")->(" + std::to_string(line.final.n) + "," +
+                                 std::to_string(line.final.l) + "," + std::to_string(line.final.m) + ")",
+                             line.allowed ? "allowed" : "forbidden");
+                }
+
+                for (std::size_t index = 0; index < state_.derived.referenceLines.size(); ++index) {
+                    const auto& line = state_.derived.referenceLines[index];
+                    if (line.wavelengthNm < state_.reporting.spectrumPlotWindow.minX ||
+                        line.wavelengthNm > state_.reporting.spectrumPlotWindow.maxX ||
+                        line.photonEnergyEv < state_.reporting.spectrumPlotWindow.minY ||
+                        line.photonEnergyEv > state_.reporting.spectrumPlotWindow.maxY) {
+                        continue;
+                    }
+                    writeRow(stream,
+                             "谱线图",
+                             "参考",
+                             index,
+                             line.seriesName,
+                             line.wavelengthNm,
+                             line.photonEnergyEv,
+                             "(" + std::to_string(line.initial.n) + "," + std::to_string(line.initial.l) + "," +
+                                 std::to_string(line.initial.m) + ")->(" + std::to_string(line.final.n) + "," +
+                                 std::to_string(line.final.l) + "," + std::to_string(line.final.m) + ")");
+                }
+
+                for (std::size_t index = 0; index < state_.derived.radialDistribution.size(); ++index) {
+                    const double radiusNm = state_.derived.radialDistribution[index].first * 1.0e9;
+                    const double probability = state_.derived.radialDistribution[index].second;
+                    if (radiusNm < state_.reporting.radialPlotWindow.minX ||
+                        radiusNm > state_.reporting.radialPlotWindow.maxX ||
+                        probability < state_.reporting.radialPlotWindow.minY ||
+                        probability > state_.reporting.radialPlotWindow.maxY) {
+                        continue;
+                    }
+                    writeRow(stream, "径向分布", "计算", index, "P(r)", radiusNm, probability);
+                }
+
+                for (std::size_t index = 0; index < state_.derived.centralField.samples.size(); ++index) {
+                    const auto& sample = state_.derived.centralField.samples[index];
+                    if (sample.radiusBohr < state_.reporting.centralFieldPlotWindow.minX ||
+                        sample.radiusBohr > state_.reporting.centralFieldPlotWindow.maxX ||
+                        sample.potentialHartree < state_.reporting.centralFieldPlotWindow.minY ||
+                        sample.potentialHartree > state_.reporting.centralFieldPlotWindow.maxY) {
+                        continue;
+                    }
+                    writeRow(stream,
+                             "中心场势",
+                             "计算",
+                             index,
+                             "V(r)",
+                             sample.radiusBohr,
+                             sample.potentialHartree,
+                             "Z_eff=" + std::to_string(sample.effectiveCharge));
+                }
+
+                for (std::size_t index = 0; index < state_.derived.solver.convergence.size(); ++index) {
+                    const auto& sample = state_.derived.solver.convergence[index];
+                    const double stepPm = sample.gridStepMeters * 1.0e12;
+                    if (stepPm < state_.reporting.convergencePlotWindow.minX ||
+                        stepPm > state_.reporting.convergencePlotWindow.maxX ||
+                        sample.errorEv < state_.reporting.convergencePlotWindow.minY ||
+                        sample.errorEv > state_.reporting.convergencePlotWindow.maxY) {
+                        continue;
+                    }
+                    writeRow(stream, "求解收敛曲线", "计算", index, "误差", stepPm, sample.errorEv);
+                }
+            });
+        };
+
+        const auto exportSplitFile = [&](const std::filesystem::path& path,
+                                         const std::function<void(std::ofstream&)>& emitRows) -> bool {
+            return writeCsvFile(path, emitRows);
+        };
+
+        if (!state_.reporting.csvSplitByPlot) {
+            if (exportSingleFile(baseOutputPath)) {
+                exportedPaths.push_back(baseOutputPath);
+            }
+        } else {
+            const std::filesystem::path energyPath = appendStemSuffix(baseOutputPath, "_energy");
+            if (exportSplitFile(energyPath, [&](std::ofstream& stream) {
+                    for (std::size_t index = 0; index < state_.derived.energyLevels.size(); ++index) {
+                        const auto& level = state_.derived.energyLevels[index];
+                        if (level.energyEv < state_.reporting.energyPlotWindow.minY ||
+                            level.energyEv > state_.reporting.energyPlotWindow.maxY) {
+                            continue;
+                        }
+                        std::string stateTag = "可见";
+                        if (level.n == state_.transition.initial.n) {
+                            stateTag = "初态";
+                        } else if (level.n == state_.transition.final.n) {
+                            stateTag = "末态";
+                        }
+                        writeRow(stream, "能级图", "计算", index, "n=" + std::to_string(level.n), static_cast<double>(level.n), level.energyEv, stateTag);
+                    }
+                })) {
+                exportedPaths.push_back(energyPath);
+            }
+
+            const std::filesystem::path spectrumPath = appendStemSuffix(baseOutputPath, "_spectrum");
+            if (exportSplitFile(spectrumPath, [&](std::ofstream& stream) {
+                    for (std::size_t index = 0; index < state_.derived.spectrumLines.size(); ++index) {
+                        const auto& line = state_.derived.spectrumLines[index];
+                        if (state_.transition.enforceRules && !line.allowed) {
+                            continue;
+                        }
+                        if (line.wavelengthNm < state_.reporting.spectrumPlotWindow.minX ||
+                            line.wavelengthNm > state_.reporting.spectrumPlotWindow.maxX ||
+                            line.photonEnergyEv < state_.reporting.spectrumPlotWindow.minY ||
+                            line.photonEnergyEv > state_.reporting.spectrumPlotWindow.maxY) {
+                            continue;
+                        }
+                        writeRow(stream,
+                                 "谱线图",
+                                 "计算",
+                                 index,
+                                 line.seriesName,
+                                 line.wavelengthNm,
+                                 line.photonEnergyEv,
+                                 "(" + std::to_string(line.initial.n) + "," + std::to_string(line.initial.l) + "," +
+                                     std::to_string(line.initial.m) + ")->(" + std::to_string(line.final.n) + "," +
+                                     std::to_string(line.final.l) + "," + std::to_string(line.final.m) + ")",
+                                 line.allowed ? "allowed" : "forbidden");
+                    }
+                    for (std::size_t index = 0; index < state_.derived.referenceLines.size(); ++index) {
+                        const auto& line = state_.derived.referenceLines[index];
+                        if (line.wavelengthNm < state_.reporting.spectrumPlotWindow.minX ||
+                            line.wavelengthNm > state_.reporting.spectrumPlotWindow.maxX ||
+                            line.photonEnergyEv < state_.reporting.spectrumPlotWindow.minY ||
+                            line.photonEnergyEv > state_.reporting.spectrumPlotWindow.maxY) {
+                            continue;
+                        }
+                        writeRow(stream,
+                                 "谱线图",
+                                 "参考",
+                                 index,
+                                 line.seriesName,
+                                 line.wavelengthNm,
+                                 line.photonEnergyEv,
+                                 "(" + std::to_string(line.initial.n) + "," + std::to_string(line.initial.l) + "," +
+                                     std::to_string(line.initial.m) + ")->(" + std::to_string(line.final.n) + "," +
+                                     std::to_string(line.final.l) + "," + std::to_string(line.final.m) + ")");
+                    }
+                })) {
+                exportedPaths.push_back(spectrumPath);
+            }
+
+            const std::filesystem::path radialPath = appendStemSuffix(baseOutputPath, "_radial");
+            if (exportSplitFile(radialPath, [&](std::ofstream& stream) {
+                    for (std::size_t index = 0; index < state_.derived.radialDistribution.size(); ++index) {
+                        const double radiusNm = state_.derived.radialDistribution[index].first * 1.0e9;
+                        const double probability = state_.derived.radialDistribution[index].second;
+                        if (radiusNm < state_.reporting.radialPlotWindow.minX ||
+                            radiusNm > state_.reporting.radialPlotWindow.maxX ||
+                            probability < state_.reporting.radialPlotWindow.minY ||
+                            probability > state_.reporting.radialPlotWindow.maxY) {
+                            continue;
+                        }
+                        writeRow(stream, "径向分布", "计算", index, "P(r)", radiusNm, probability);
+                    }
+                })) {
+                exportedPaths.push_back(radialPath);
+            }
+
+            const std::filesystem::path centralPath = appendStemSuffix(baseOutputPath, "_central_field");
+            if (exportSplitFile(centralPath, [&](std::ofstream& stream) {
+                    for (std::size_t index = 0; index < state_.derived.centralField.samples.size(); ++index) {
+                        const auto& sample = state_.derived.centralField.samples[index];
+                        if (sample.radiusBohr < state_.reporting.centralFieldPlotWindow.minX ||
+                            sample.radiusBohr > state_.reporting.centralFieldPlotWindow.maxX ||
+                            sample.potentialHartree < state_.reporting.centralFieldPlotWindow.minY ||
+                            sample.potentialHartree > state_.reporting.centralFieldPlotWindow.maxY) {
+                            continue;
+                        }
+                        writeRow(stream,
+                                 "中心场势",
+                                 "计算",
+                                 index,
+                                 "V(r)",
+                                 sample.radiusBohr,
+                                 sample.potentialHartree,
+                                 "Z_eff=" + std::to_string(sample.effectiveCharge));
+                    }
+                })) {
+                exportedPaths.push_back(centralPath);
+            }
+
+            const std::filesystem::path convergencePath = appendStemSuffix(baseOutputPath, "_convergence");
+            if (exportSplitFile(convergencePath, [&](std::ofstream& stream) {
+                    for (std::size_t index = 0; index < state_.derived.solver.convergence.size(); ++index) {
+                        const auto& sample = state_.derived.solver.convergence[index];
+                        const double stepPm = sample.gridStepMeters * 1.0e12;
+                        if (stepPm < state_.reporting.convergencePlotWindow.minX ||
+                            stepPm > state_.reporting.convergencePlotWindow.maxX ||
+                            sample.errorEv < state_.reporting.convergencePlotWindow.minY ||
+                            sample.errorEv > state_.reporting.convergencePlotWindow.maxY) {
+                            continue;
+                        }
+                        writeRow(stream, "求解收敛曲线", "计算", index, "误差", stepPm, sample.errorEv);
+                    }
+                })) {
+                exportedPaths.push_back(convergencePath);
+            }
+        }
+
+        return exportedPaths;
+    } catch (const std::exception& exception) {
+        logger_.error("写入当前窗口 CSV 失败: " + std::string(exception.what()));
+        return {};
+    }
+}
+
+void Application::refreshMethodAndValidationMetadata() {
+    state_.derived.methodStamps.clear();
+    state_.derived.validationRecords.clear();
+
+    const auto appendMethod = [this](const quantum::meta::MethodStamp& stamp) {
+        if (stamp.methodName.empty()) {
+            return;
+        }
+        const auto duplicate = std::find_if(state_.derived.methodStamps.begin(),
+                                            state_.derived.methodStamps.end(),
+                                            [&stamp](const quantum::meta::MethodStamp& existing) {
+                                                return existing.methodName == stamp.methodName &&
+                                                       existing.approximation == stamp.approximation;
+                                            });
+        if (duplicate == state_.derived.methodStamps.end()) {
+            state_.derived.methodStamps.push_back(stamp);
+        }
+    };
+
+    appendMethod(state_.derived.configuration.method);
+    appendMethod(state_.derived.slater.method);
+    appendMethod(state_.derived.bohrMetrics.method);
+    appendMethod(state_.derived.transition.method);
+    appendMethod(state_.derived.spectroscopy.method);
+    appendMethod(state_.derived.centralField.method);
+    appendMethod(state_.derived.solver.method);
+    if (const auto* elementMetadata = elementDatabase_.elementMetadataByAtomicNumber(state_.atomicNumber);
+        elementMetadata != nullptr) {
+        appendMethod(elementMetadata->method);
+    }
+    if ((state_.demo.enabled || state_.demo.useScriptPlayback) &&
+        (currentDemoStep() != nullptr)) {
+        const auto* sceneStep = currentDemoStep();
+        appendMethod(sceneStep->method.methodName.empty() ? scenePresetMethodStamp(sceneStep->approximationMode)
+                                                          : sceneStep->method);
+    }
+    for (const auto& line : state_.derived.referenceLines) {
+        appendMethod(line.method);
+    }
+    for (const auto& level : state_.derived.energyLevels) {
+        appendMethod(level.method);
+    }
+
+    const auto appendRecords = [this](const auto& records) {
+        state_.derived.validationRecords.insert(state_.derived.validationRecords.end(), records.begin(), records.end());
+    };
+
+    appendRecords(state_.derived.bohrMetrics.validation);
+    appendRecords(state_.derived.slater.validation);
+    appendRecords(state_.derived.transition.validation);
+    appendRecords(state_.derived.spectroscopy.validation);
+    appendRecords(state_.derived.centralField.validation);
+    appendRecords(state_.derived.solver.validation);
+    for (const auto& line : state_.derived.referenceLines) {
+        appendRecords(line.validation);
+    }
+    for (const auto& level : state_.derived.energyLevels) {
+        if (!level.validation.caseName.empty()) {
+            state_.derived.validationRecords.push_back(level.validation);
+        }
+    }
+    for (const auto& sample : state_.derived.solver.convergence) {
+        if (!sample.validation.caseName.empty()) {
+            state_.derived.validationRecords.push_back(sample.validation);
+        }
+    }
+
+    if (state_.derived.cloud.stats.acceptedCount > 0) {
+        quantum::meta::ValidationRecord record;
+        record.status = (std::abs(state_.derived.cloud.stats.normalizationError) <= 5.0e-2)
+                            ? quantum::meta::ValidationStatus::ReferenceMatched
+                            : quantum::meta::ValidationStatus::SanityChecked;
+        record.caseName = "Cloud normalization estimate";
+        record.referenceName = "Unity normalization";
+        record.units = "";
+        record.referenceValue = 1.0;
+        record.measuredValue = state_.derived.cloud.stats.normalizationEstimate;
+        record.absoluteError = std::abs(state_.derived.cloud.stats.normalizationError);
+        record.relativeError = std::abs(state_.derived.cloud.stats.normalizationError);
+        record.notes = state_.derived.cloud.stats.usedNumericalRadial
+                           ? "Monte Carlo estimate with numerical radial override when available."
+                           : "Monte Carlo estimate from analytic or effective-charge sampling.";
+        record.source = {"cloud-normalization", "Internal cloud normalization estimate", "runtime", "1", "", ""};
+        state_.derived.validationRecords.push_back(std::move(record));
+    }
+
+    if (state_.reference.enabled) {
+        const auto referenceIt =
+            std::find_if(state_.derived.referenceLines.begin(),
+                         state_.derived.referenceLines.end(),
+                         [this](const quantum::physics::SpectrumLine& line) {
+                             return line.initial.n == state_.transition.initial.n &&
+                                    line.initial.l == state_.transition.initial.l &&
+                                    line.final.n == state_.transition.final.n &&
+                                    line.final.l == state_.transition.final.l;
+                         });
+        if (referenceIt != state_.derived.referenceLines.end()) {
+            quantum::meta::ValidationRecord record;
+            const double error = std::abs(state_.derived.transition.wavelengthNm - referenceIt->wavelengthNm);
+            record.status = (error <= 0.5) ? quantum::meta::ValidationStatus::ReferenceMatched
+                                           : quantum::meta::ValidationStatus::SanityChecked;
+            record.caseName = "Local reference line comparison";
+            record.referenceName = "assets/data/nist_reference_lines.csv";
+            record.units = "nm";
+            record.referenceValue = referenceIt->wavelengthNm;
+            record.measuredValue = state_.derived.transition.wavelengthNm;
+            record.absoluteError = error;
+            record.relativeError =
+                (std::abs(referenceIt->wavelengthNm) > 1.0e-30) ? (error / std::abs(referenceIt->wavelengthNm)) : 0.0;
+            record.notes = "Reference line matched by n and l quantum numbers only.";
+            record.source = {"local-reference-csv",
+                             "Local reference line CSV",
+                             "assets/data/nist_reference_lines.csv",
+                             "1",
+                             "",
+                             ""};
+            state_.derived.validationRecords.push_back(std::move(record));
+        }
+    }
+}
+
+quantum::validation::ValidationReportInput Application::makeValidationReportInput() const {
+    quantum::validation::ValidationReportInput input;
+    input.title = "Quantum Atom Simulation Validation Report";
+    input.subject = state_.derived.element.name + " (" + state_.derived.element.symbol + "), Z=" +
+                    std::to_string(state_.atomicNumber) + ", q=" + std::to_string(state_.chargeState);
+
+    std::ostringstream summary;
+    summary << "model=" << modelKindTag(state_.modelKind) << ", approximation=" << approximationModeTag(state_.approximationMode)
+            << ", active_zeff=" << state_.derived.activeZeff << ", transition=(" << state_.transition.initial.n << ','
+            << state_.transition.initial.l << ',' << state_.transition.initial.m << ")->(" << state_.transition.final.n
+            << ',' << state_.transition.final.l << ',' << state_.transition.final.m << "), solver=(" << state_.solver.qn.n
+            << ',' << state_.solver.qn.l << ',' << state_.solver.qn.m << ')'
+            << ", central_field=" << (state_.solver.useScreenedCentralField ? "screened" : "hydrogenic")
+            << ", fine=" << (state_.spectroscopy.applyFineStructure ? "on" : "off")
+            << ", zeeman=" << (state_.spectroscopy.applyZeeman ? "on" : "off")
+            << ", stark=" << (state_.spectroscopy.applyStark ? "on" : "off");
+    input.summary = summary.str();
+    input.approximationWarning = state_.derived.approximationWarning;
+
+    const auto appendNamedMethod = [&input](const std::string& label, const quantum::meta::MethodStamp& stamp) {
+        if (!stamp.methodName.empty()) {
+            input.methods.push_back({label, stamp});
+        }
+    };
+
+    appendNamedMethod("Configuration builder", state_.derived.configuration.method);
+    appendNamedMethod("Shielding model", state_.derived.slater.method);
+    appendNamedMethod("Hydrogenic metrics", state_.derived.bohrMetrics.method);
+    appendNamedMethod("Transition model", state_.derived.transition.method);
+    appendNamedMethod("Tier 3 spectroscopy", state_.derived.spectroscopy.method);
+    appendNamedMethod("Tier 1 central field", state_.derived.centralField.method);
+    appendNamedMethod("Numerical solver", state_.derived.solver.method);
+    if (const auto* elementMetadata = elementDatabase_.elementMetadataByAtomicNumber(state_.atomicNumber);
+        elementMetadata != nullptr) {
+        appendNamedMethod("Element metadata", elementMetadata->method);
+    }
+    if ((state_.demo.enabled || state_.demo.useScriptPlayback) &&
+        (currentDemoStep() != nullptr)) {
+        const auto* sceneStep = currentDemoStep();
+        appendNamedMethod("Scene preset",
+                          sceneStep->method.methodName.empty() ? scenePresetMethodStamp(sceneStep->approximationMode)
+                                                               : sceneStep->method);
+    }
+    input.records = state_.derived.validationRecords;
+    return input;
 }
 
 void Application::loadDefaultDemoScript() {
@@ -768,7 +1476,20 @@ bool Application::saveDemoScriptToFile(const std::filesystem::path& scriptPath,
         root["version"] = 1;
         root["steps"] = nlohmann::json::array();
         for (const auto& step : steps) {
-            root["steps"].push_back(demoStepToJson(step));
+            DemoScriptStep enriched = step;
+            if (enriched.method.methodName.empty()) {
+                enriched.method = scenePresetMethodStamp(enriched.approximationMode);
+            }
+            if (enriched.source.id.empty()) {
+                enriched.source = builtInSceneSource();
+            }
+            if (enriched.provenance.recordId.empty()) {
+                enriched.provenance = {"demo-step-" + std::to_string(enriched.atomicNumber) + "-" + enriched.name,
+                                       enriched.source.id,
+                                       "app::saveDemoScriptToFile",
+                                       "Serialized demo step with fallback metadata."};
+            }
+            root["steps"].push_back(demoStepToJson(enriched));
         }
 
         std::ofstream stream(scriptPath, std::ios::binary | std::ios::trunc);
@@ -801,6 +1522,17 @@ void Application::captureCurrentDemoStep() {
     step.maxSpectrumN = state_.bohr.maxSpectrumN;
     step.transition = state_.transition;
     step.cameraPose = camera_.pose();
+    step.method = scenePresetMethodStamp(step.approximationMode);
+    step.source = {"recorded-scene",
+                   "Recorded scene preset",
+                   "runtime",
+                   "1",
+                   "",
+                   state_.demo.scriptPath};
+    step.provenance = {"recorded-demo-step-" + std::to_string(recordedDemoSteps_.size() + 1),
+                       step.source.id,
+                       "app::captureCurrentDemoStep",
+                       "Captured from the current UI state."};
     if (step.components.empty()) {
         step.components.push_back({state_.solver.qn, 1.0, 0.0, state_.derived.activeZeff});
     }
@@ -816,6 +1548,16 @@ const std::vector<DemoScriptStep>& Application::currentDemoSteps() const {
     }
     static const std::vector<DemoScriptStep> kBuiltInSteps(builtInDemoSteps().begin(), builtInDemoSteps().end());
     return kBuiltInSteps;
+}
+
+const DemoScriptStep* Application::currentDemoStep() const {
+    const auto& steps = currentDemoSteps();
+    if (steps.empty()) {
+        return nullptr;
+    }
+    const std::size_t index = static_cast<std::size_t>(
+        std::clamp(state_.demo.currentStepIndex, 0, static_cast<int>(steps.size() - 1)));
+    return &steps[index];
 }
 
 Application::CloudBuildInput Application::makeCloudBuildInput(CloudBuildStage stage) const {
@@ -937,7 +1679,7 @@ void Application::applyDemoStep(std::size_t stepIndex, bool immediateCamera) {
     state_.bohr.maxSpectrumN = step.maxSpectrumN;
     state_.transition = step.transition;
     state_.demo.currentStepIndex = static_cast<int>(wrappedIndex);
-    state_.demo.currentStepName = step.name;
+    state_.demo.currentStepName = localizedStepName(step);
     state_.demo.activeScriptName =
         (state_.demo.useScriptPlayback && !loadedDemoSteps_.empty()) ? state_.demo.activeScriptName : "内置演示";
     state_.demo.stepProgress = 0.0;
@@ -1102,6 +1844,7 @@ void Application::applyCloudBuildResult(CloudBuildOutput&& result) {
                                   state_.derived.cloud.stats.monteCarloSamples,
                                   state_.derived.cloud.stats.previewStage,
                                   state_.derived.cloud.stats.qualityRatio);
+    refreshMethodAndValidationMetadata();
 
     std::ostringstream stream;
     stream.setf(std::ios::fixed, std::ios::floatfield);
@@ -1117,6 +1860,27 @@ void Application::applyCloudBuildResult(CloudBuildOutput&& result) {
 
 void Application::loadReferenceLines() {
     state_.derived.referenceLines.clear();
+    for (const auto& record : elementDatabase_.referenceTransitions(state_.atomicNumber)) {
+        quantum::physics::SpectrumLine referenceLine;
+        referenceLine.seriesName = record.label;
+        referenceLine.initial.n = record.upper.n;
+        referenceLine.initial.l = record.upper.l;
+        referenceLine.initial.m = record.upper.m;
+        referenceLine.final.n = record.lower.n;
+        referenceLine.final.l = record.lower.l;
+        referenceLine.final.m = record.lower.m;
+        referenceLine.wavelengthNm = record.wavelengthNm;
+        referenceLine.photonEnergyEv = record.photonEnergyEv;
+        referenceLine.allowed = record.allowed;
+        referenceLine.method = record.method;
+        referenceLine.validation = {record.validation};
+        referenceLine.source = record.validation.source;
+        referenceLine.provenance = record.provenance;
+        state_.derived.referenceLines.push_back(std::move(referenceLine));
+    }
+    if (!state_.derived.referenceLines.empty()) {
+        return;
+    }
     const auto csvPath = projectRoot_ / state_.reference.csvPath;
     std::ifstream stream(csvPath);
     if (!stream.is_open()) {
@@ -1173,6 +1937,20 @@ void Application::processSceneCameraInput(const quantum::ui::UiFrameResult& uiFr
     }
     if (dollying) {
         camera_.dolly(io.MouseWheel);
+    }
+}
+
+void Application::fitCameraToScene(quantum::app::SceneFitMode mode, bool immediate) {
+    sceneRenderer_.configureCameraForScene(state_, camera_);
+    camera_.setTransitionDuration(static_cast<float>(state_.view.fitTransitionSeconds));
+    auto pose = sceneRenderer_.fitScenePose(state_, camera_, mode);
+    if (state_.view.fitLockTarget) {
+        pose.target = camera_.pose().target;
+    }
+    if (immediate) {
+        camera_.jumpToPose(pose);
+    } else {
+        camera_.animateToPose(pose);
     }
 }
 

@@ -17,6 +17,7 @@ constexpr int kFullVolumeSlices = 64;
 constexpr int kMediumVolumeSlices = 40;
 constexpr int kFarVolumeSlices = 24;
 constexpr int kInteractionVolumeSlices = 16;
+constexpr float kBaseGridHalfExtent = 10.0f;
 
 constexpr const char* kMeshVertexShader = R"(
 #version 330 core
@@ -25,29 +26,30 @@ layout(location = 0) in vec3 aPosition;
 uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
+uniform mat3 uNormalMatrix;
 
-out vec3 vWorldPosition;
+out vec3 vNormal;
 
 void main() {
     vec4 world = uModel * vec4(aPosition, 1.0);
-    vWorldPosition = world.xyz;
+    vNormal = normalize(uNormalMatrix * aPosition);
     gl_Position = uProjection * uView * world;
 }
 )";
 
 constexpr const char* kMeshFragmentShader = R"(
 #version 330 core
-in vec3 vWorldPosition;
+in vec3 vNormal;
 
 uniform vec3 uColor;
 uniform vec3 uLightDir;
+uniform float uAlpha;
 
 out vec4 FragColor;
 
 void main() {
-    vec3 normal = normalize(vWorldPosition);
-    float ndotl = clamp(dot(normal, normalize(uLightDir)), 0.2, 1.0);
-    FragColor = vec4(uColor * ndotl, 1.0);
+    float ndotl = clamp(dot(normalize(vNormal), normalize(uLightDir)), 0.2, 1.0);
+    FragColor = vec4(uColor * ndotl, uAlpha);
 }
 )";
 
@@ -227,6 +229,10 @@ float animationTimeSeconds() {
     return static_cast<float>(std::chrono::duration<double>(now).count());
 }
 
+glm::mat3 normalMatrixFromModel(const glm::mat4& model) {
+    return glm::transpose(glm::inverse(glm::mat3(model)));
+}
+
 } // namespace
 
 SceneRenderer::~SceneRenderer() {
@@ -334,31 +340,50 @@ SceneRenderStats SceneRenderer::render(const quantum::app::SimulationState& stat
     timerSet.pointIssued = false;
     timerSet.volumeIssued = false;
 
+    configureCameraForScene(state, camera);
+
     const LODDecision lod = decideLod(state, camera);
     const VolumeSlicePlan slicePlan = chooseVolumeSlicePlan(camera);
+    const float animationTime = animationTimeSeconds();
     framebuffer_.bind();
     glViewport(0, 0, framebuffer_.width(), framebuffer_.height());
-    glClearColor(0.04f, 0.06f, 0.09f, 1.0f);
+    const bool schrodingerCloudMode = state.modelKind == quantum::app::ModelKind::SchrodingerCloud;
+    const bool compareMode = state.modelKind == quantum::app::ModelKind::Compare;
+    const float backgroundPulse = 0.008f * std::sin(animationTime * 0.23f);
+    const float backgroundBlueBias = schrodingerCloudMode ? 0.018f : (compareMode ? 0.010f : 0.0f);
+    glClearColor(0.04f + backgroundPulse * 0.5f,
+                 0.06f + backgroundPulse * 0.35f,
+                 0.09f + backgroundBlueBias + backgroundPulse,
+                 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     const glm::mat4 view = camera.viewMatrix();
     const glm::mat4 projection = camera.projectionMatrix();
-    const float animationTime = animationTimeSeconds();
-    const bool pointPassEnabled = state.view.cloudRenderMode == quantum::app::CloudRenderMode::PointCloud ||
-                                  state.view.cloudRenderMode == quantum::app::CloudRenderMode::Hybrid;
-    const bool volumePassEnabled = state.view.cloudRenderMode == quantum::app::CloudRenderMode::VolumeSlices ||
-                                   state.view.cloudRenderMode == quantum::app::CloudRenderMode::Hybrid;
+    const bool bohrMode = state.modelKind == quantum::app::ModelKind::Bohr;
+    const bool waveParticleMode = state.modelKind == quantum::app::ModelKind::WaveParticle;
+    const bool volumeModeSelected = state.view.cloudRenderMode == quantum::app::CloudRenderMode::VolumeSlices ||
+                                    state.view.cloudRenderMode == quantum::app::CloudRenderMode::Hybrid;
+    const bool hasVolumeData = state.cloud.buildVolume && volumeTexture_.id() != 0;
+    const bool orbitPassEnabled =
+        bohrMode || compareMode || (waveParticleMode && state.view.showOrbitRings);
+    const bool pointPassEnabled = waveParticleMode ||
+                                  ((schrodingerCloudMode || compareMode) &&
+                                   (state.view.cloudRenderMode == quantum::app::CloudRenderMode::PointCloud ||
+                                    state.view.cloudRenderMode == quantum::app::CloudRenderMode::Hybrid ||
+                                    (state.view.cloudRenderMode == quantum::app::CloudRenderMode::VolumeSlices &&
+                                     !hasVolumeData)));
+    const bool volumePassEnabled =
+        (schrodingerCloudMode || compareMode) && volumeModeSelected && hasVolumeData;
 
     if (gpuTimersSupported_) {
         glQueryCounter(timerSet.frameStart, GL_TIMESTAMP);
     }
 
     if (state.view.showGrid) {
-        renderGrid(view, projection);
+        renderGrid(state, camera, view, projection);
     }
     renderNucleus(view, projection, animationTime);
-    if (state.view.showOrbitRings || state.modelKind == quantum::app::ModelKind::Bohr ||
-        state.modelKind == quantum::app::ModelKind::Compare) {
+    if (orbitPassEnabled) {
         renderOrbits(state, view, projection, animationTime);
     }
 
@@ -582,26 +607,102 @@ SceneRenderer::VolumeSlicePlan SceneRenderer::chooseVolumeSlicePlan(const OrbitC
     return plan;
 }
 
-void SceneRenderer::renderGrid(const glm::mat4& view, const glm::mat4& projection) {
+float SceneRenderer::estimateSceneExtent(const quantum::app::SimulationState& state) const {
+    const int principalN = std::max(state.bohr.principalN, 1);
+    const int maxOrbitN = std::max({principalN, state.transition.initial.n, state.transition.final.n, 1});
+    const double orbitScale = static_cast<double>(maxOrbitN * maxOrbitN) /
+                              static_cast<double>(principalN * principalN);
+    const float orbitExtent = static_cast<float>(
+        std::max(0.35, state.derived.bohrMetrics.orbitalRadiusM * kSceneScale * orbitScale));
+    const float cloudExtent = std::max(0.0f, volumeExtent_ * kSceneScale);
+    return std::max({1.5f, orbitExtent * 1.8f, cloudExtent * 1.15f});
+}
+
+void SceneRenderer::configureCameraForScene(const quantum::app::SimulationState& state, OrbitCamera& camera) const {
+    const float sceneExtent = estimateSceneExtent(state);
+    const float recommendedMinDistance = std::max(0.12f, sceneExtent * 0.025f);
+    const float recommendedMaxDistance = std::max(220.0f, sceneExtent * 30.0f);
+    const float nearPlane = std::clamp(sceneExtent * 0.0008f, 0.0015f, 0.08f);
+    const float farPlane = std::max(900.0f, sceneExtent * 65.0f + camera.distanceToTarget() * 8.0f);
+    camera.setDistanceLimits(recommendedMinDistance, recommendedMaxDistance);
+    camera.setClipPlanes(nearPlane, farPlane);
+}
+
+OrbitCamera::Pose SceneRenderer::fitScenePose(const quantum::app::SimulationState& state,
+                                              const OrbitCamera& camera,
+                                              quantum::app::SceneFitMode mode) const {
+    const int principalN = std::max(state.bohr.principalN, 1);
+    const int maxOrbitN = std::max({principalN, state.transition.initial.n, state.transition.final.n, 1});
+    const double orbitScale = static_cast<double>(maxOrbitN * maxOrbitN) /
+                              static_cast<double>(principalN * principalN);
+    const float orbitExtent = static_cast<float>(
+        std::max(0.35, state.derived.bohrMetrics.orbitalRadiusM * kSceneScale * orbitScale));
+    const float cloudExtent = std::max(0.0f, volumeExtent_ * kSceneScale);
+    float sceneExtent = estimateSceneExtent(state);
+    switch (mode) {
+    case quantum::app::SceneFitMode::Nucleus:
+        sceneExtent = 0.6f;
+        break;
+    case quantum::app::SceneFitMode::Orbit:
+        sceneExtent = std::max(1.4f, orbitExtent * 1.35f);
+        break;
+    case quantum::app::SceneFitMode::Cloud:
+        sceneExtent = std::max(1.8f, cloudExtent * 1.18f);
+        break;
+    case quantum::app::SceneFitMode::Full:
+    default:
+        break;
+    }
+    OrbitCamera::Pose pose = camera.pose();
+    const float targetYOffset = (mode == quantum::app::SceneFitMode::Nucleus) ? 0.0f : std::clamp(-sceneExtent * 0.05f, -1.0f, 0.0f);
+    pose.target = glm::vec3(0.0f, targetYOffset, 0.0f);
+    pose.distance = std::max(1.2f, sceneExtent * 2.6f);
+    return pose;
+}
+
+void SceneRenderer::renderGrid(const quantum::app::SimulationState& state,
+                               const OrbitCamera& camera,
+                               const glm::mat4& view,
+                               const glm::mat4& projection) {
+    const float sceneExtent = estimateSceneExtent(state);
+    const float halfExtent = std::max({6.0f, camera.distanceToTarget() * 1.35f, sceneExtent});
+    const float gridScale = halfExtent / kBaseGridHalfExtent;
+    const glm::vec3 target = camera.pose().target;
+    const float gridY = std::min(0.0f, target.y - sceneExtent * 0.22f);
+
     meshShader_.use();
-    const glm::mat4 model(1.0f);
+    const glm::mat4 model =
+        glm::translate(glm::mat4(1.0f), glm::vec3(target.x, gridY, target.z)) *
+        glm::scale(glm::mat4(1.0f), glm::vec3(gridScale, 1.0f, gridScale));
     glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uModel"), 1, GL_FALSE, glm::value_ptr(model));
     glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uView"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uProjection"), 1, GL_FALSE, glm::value_ptr(projection));
-    glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), 0.22f, 0.28f, 0.34f);
+    glUniformMatrix3fv(glGetUniformLocation(meshShader_.id(), "uNormalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrixFromModel(model)));
+    glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), 0.24f, 0.31f, 0.38f);
     glUniform3f(glGetUniformLocation(meshShader_.id(), "uLightDir"), -0.4f, 1.0f, 0.2f);
+    glUniform1f(glGetUniformLocation(meshShader_.id(), "uAlpha"), 0.68f);
     gridMesh_.draw();
 }
 
 void SceneRenderer::renderNucleus(const glm::mat4& view, const glm::mat4& projection, float animationTimeSeconds) {
     meshShader_.use();
     const float pulse = 1.0f + 0.08f * std::sin(animationTimeSeconds * 2.2f);
-    const glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(0.18f * pulse));
-    glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uModel"), 1, GL_FALSE, glm::value_ptr(model));
     glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uView"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uProjection"), 1, GL_FALSE, glm::value_ptr(projection));
-    glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), 0.95f, 0.26f, 0.21f);
     glUniform3f(glGetUniformLocation(meshShader_.id(), "uLightDir"), -0.4f, 1.0f, 0.2f);
+
+    const glm::mat4 haloModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.30f * pulse));
+    glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uModel"), 1, GL_FALSE, glm::value_ptr(haloModel));
+    glUniformMatrix3fv(glGetUniformLocation(meshShader_.id(), "uNormalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrixFromModel(haloModel)));
+    glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), 1.00f, 0.52f, 0.24f);
+    glUniform1f(glGetUniformLocation(meshShader_.id(), "uAlpha"), 0.18f);
+    sphereMesh_.draw();
+
+    const glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(0.18f * pulse));
+    glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uModel"), 1, GL_FALSE, glm::value_ptr(model));
+    glUniformMatrix3fv(glGetUniformLocation(meshShader_.id(), "uNormalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrixFromModel(model)));
+    glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), 0.95f, 0.26f, 0.21f);
+    glUniform1f(glGetUniformLocation(meshShader_.id(), "uAlpha"), 1.0f);
     sphereMesh_.draw();
 }
 
@@ -622,8 +723,42 @@ void SceneRenderer::renderOrbits(const quantum::app::SimulationState& state,
                                                 static_cast<double>(n * n) /
                                                 static_cast<double>(std::max(1, state.bohr.principalN * state.bohr.principalN)));
         const glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(std::max(0.35f, radius)));
+        glm::vec3 orbitColor(0.50f, 0.58f, 0.66f);
+        float alpha = 0.52f;
+        if (n == state.bohr.principalN) {
+            orbitColor = glm::vec3(0.95f, 0.82f, 0.38f);
+            alpha = 0.92f;
+        } else if (n == state.transition.initial.n) {
+            orbitColor = glm::vec3(0.92f, 0.45f, 0.34f);
+            alpha = 0.78f;
+        } else if (n == state.transition.final.n) {
+            orbitColor = glm::vec3(0.37f, 0.78f, 0.95f);
+            alpha = 0.78f;
+        }
         glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uModel"), 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix3fv(glGetUniformLocation(meshShader_.id(), "uNormalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrixFromModel(model)));
+        glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), orbitColor.r, orbitColor.g, orbitColor.b);
+        glUniform1f(glGetUniformLocation(meshShader_.id(), "uAlpha"), alpha);
         ringMesh_.draw();
+
+        if (n == state.bohr.principalN || n == state.transition.initial.n || n == state.transition.final.n) {
+            const float speed = 0.55f + 0.35f / static_cast<float>(n);
+            const float angle = animationTimeSeconds * speed + static_cast<float>(n) * 0.75f;
+            const glm::vec3 orbitPosition(std::cos(angle) * std::max(0.35f, radius),
+                                          0.0f,
+                                          std::sin(angle) * std::max(0.35f, radius));
+            const glm::mat4 markerModel =
+                glm::translate(glm::mat4(1.0f), orbitPosition) *
+                glm::scale(glm::mat4(1.0f), glm::vec3(0.05f + 0.01f * static_cast<float>(n)));
+            glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uModel"), 1, GL_FALSE, glm::value_ptr(markerModel));
+            glUniformMatrix3fv(glGetUniformLocation(meshShader_.id(), "uNormalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrixFromModel(markerModel)));
+            glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"),
+                        orbitColor.r * 1.10f,
+                        orbitColor.g * 1.10f,
+                        orbitColor.b * 1.10f);
+            glUniform1f(glGetUniformLocation(meshShader_.id(), "uAlpha"), 0.95f);
+            sphereMesh_.draw();
+        }
     }
 }
 
@@ -641,9 +776,11 @@ void SceneRenderer::renderPointCloud(const quantum::app::SimulationState& state,
     glUniform1f(glGetUniformLocation(pointShader_.id(), "uPointSize"), state.view.pointSize);
     glUniform1f(glGetUniformLocation(pointShader_.id(), "uTime"), animationTimeSeconds);
 
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     glBindVertexArray(pointVao_);
     glDrawArrays(GL_POINTS, 0, std::min<GLsizei>(pointCount_, static_cast<GLsizei>(renderedPointCount)));
     glBindVertexArray(0);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void SceneRenderer::renderVolume(const quantum::app::SimulationState& state,
@@ -666,6 +803,7 @@ void SceneRenderer::renderVolume(const quantum::app::SimulationState& state,
     glUniform1i(glGetUniformLocation(volumeShader_.id(), "uSliceAxis"), slicePlan.axis);
     volumeTexture_.bind(GL_TEXTURE0);
 
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_FALSE);
     for (int slice = 0; slice < sliceCount; ++slice) {
         const int sliceIndex = slicePlan.reverse ? (sliceCount - 1 - slice) : slice;

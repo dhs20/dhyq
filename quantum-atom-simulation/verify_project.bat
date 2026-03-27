@@ -2,32 +2,9 @@
 setlocal
 
 set "ROOT=%~dp0"
-set "TEST_EXE=%ROOT%build\windows\x64\release\quantum_atom_tests.exe"
-set "APP_EXE=%ROOT%build\windows\x64\release\quantum_atom_simulation.exe"
-
-cd /d "%ROOT%"
-
-if not exist "%TEST_EXE%" (
-    echo [error] Test executable not found:
-    echo         %TEST_EXE%
-    echo [hint]  Build the project first with xmake -y.
-    exit /b 1
-)
-
-if not exist "%APP_EXE%" (
-    echo [error] Application executable not found:
-    echo         %APP_EXE%
-    echo [hint]  Build the project first with xmake -y.
-    exit /b 1
-)
-
-echo [1/2] Running tests...
-"%TEST_EXE%"
-if errorlevel 1 (
-    echo [error] Tests failed.
-    exit /b 1
-)
-
-echo [2/2] Launching application...
-"%APP_EXE%"
+powershell -ExecutionPolicy Bypass -File "%ROOT%scripts\build.ps1" -Configuration Release -ProjectRoot "%ROOT%"
+if errorlevel 1 exit /b %errorlevel%
+powershell -ExecutionPolicy Bypass -Command "& '%ROOT%build\windows\x64\release\quantum_atom_tests.exe'"
+if errorlevel 1 exit /b %errorlevel%
+powershell -ExecutionPolicy Bypass -File "%ROOT%scripts\smoke_test.ps1" -Configuration Release -ProjectRoot "%ROOT%"
 exit /b %errorlevel%

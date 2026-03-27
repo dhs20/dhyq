@@ -1,8 +1,11 @@
-#pragma once
+﻿#pragma once
 
+#include "quantum/meta/MethodMetadata.h"
 #include "quantum/physics/AtomicPhysics.h"
+#include "quantum/physics/CentralField.h"
 #include "quantum/physics/CloudGenerator.h"
 #include "quantum/physics/NumericalSolver.h"
+#include "quantum/spectroscopy/HydrogenicCorrections.h"
 
 #include <string>
 #include <utility>
@@ -21,6 +24,13 @@ enum class CloudRenderMode {
     PointCloud,
     VolumeSlices,
     Hybrid
+};
+
+enum class SceneFitMode {
+    Full,
+    Nucleus,
+    Orbit,
+    Cloud
 };
 
 enum class SamplingQualityPreset {
@@ -69,6 +79,10 @@ struct SolverSettings {
     int gridPoints = 4096;
     int convergencePasses = 5;
     double maxScaledRadius = 120.0;
+    bool useScreenedCentralField = false;
+    bool autoResidualCharge = true;
+    double residualCharge = 1.0;
+    double screeningLengthBohr = 1.5;
 };
 
 struct ViewSettings {
@@ -78,11 +92,37 @@ struct ViewSettings {
     float pointSize = 3.0f;
     float exposure = 1.0f;
     bool interactionActive = false;
+    double fitTransitionSeconds = 0.65;
+    bool fitLockTarget = false;
 };
 
 struct ReferenceSettings {
     bool enabled = true;
     std::string csvPath = "assets/data/nist_reference_lines.csv";
+};
+
+struct PlotWindowRange {
+    bool hasOverride = false;
+    double minX = 0.0;
+    double maxX = 1.0;
+    double minY = 0.0;
+    double maxY = 1.0;
+};
+
+struct ReportingSettings {
+    bool exportValidationReportRequested = false;
+    std::string outputPath = "docs/reports/latest-validation-report.md";
+    std::string exportStatus = "尚未导出验证报告";
+    bool exportCurrentPlotCsvRequested = false;
+    std::string csvOutputPath = "docs/reports/current-plot-window.csv";
+    std::string csvExportStatus = "尚未导出当前窗口 CSV";
+    bool csvAppendTimestamp = true;
+    bool csvSplitByPlot = false;
+    PlotWindowRange energyPlotWindow;
+    PlotWindowRange spectrumPlotWindow;
+    PlotWindowRange radialPlotWindow;
+    PlotWindowRange centralFieldPlotWindow;
+    PlotWindowRange convergencePlotWindow;
 };
 
 struct AutoDemoSettings {
@@ -117,12 +157,16 @@ struct DerivedData {
     double activeZeff = 1.0;
     quantum::physics::HydrogenicMetrics bohrMetrics;
     quantum::physics::TransitionResult transition;
+    quantum::spectroscopy::SpectroscopyCorrectionResult spectroscopy;
     std::vector<quantum::physics::SpectrumLine> spectrumLines;
     std::vector<quantum::physics::SpectrumLine> referenceLines;
     std::vector<quantum::physics::EnergyLevelSample> energyLevels;
     std::vector<std::pair<double, double>> radialDistribution;
     quantum::physics::CloudData cloud;
+    quantum::physics::CentralFieldProfile centralField;
     quantum::physics::NumericalSolverResult solver;
+    std::vector<quantum::meta::MethodStamp> methodStamps;
+    std::vector<quantum::meta::ValidationRecord> validationRecords;
 };
 
 struct DirtyFlags {
@@ -142,8 +186,10 @@ struct SimulationState {
     BohrSettings bohr;
     CloudSettings cloud;
     SolverSettings solver;
+    quantum::spectroscopy::SpectroscopySettings spectroscopy;
     ViewSettings view;
     ReferenceSettings reference;
+    ReportingSettings reporting;
     AutoDemoSettings demo;
     DerivedData derived;
     DirtyFlags dirty;

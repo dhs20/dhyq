@@ -10,6 +10,14 @@
 namespace quantum::physics {
 namespace {
 
+using quantum::meta::AnimationKind;
+using quantum::meta::MethodStamp;
+using quantum::meta::ModelTier;
+using quantum::meta::ProvenanceRecord;
+using quantum::meta::SourceRecord;
+using quantum::meta::ValidationRecord;
+using quantum::meta::ValidationStatus;
+
 double factorial(int n) {
     if (n < 0) {
         throw std::invalid_argument("factorial input must be non-negative");
@@ -109,6 +117,115 @@ std::map<int, std::vector<SubshellOccupancy>> exceptionWhitelist() {
         {29, {{1, 0, 2}, {2, 0, 2}, {2, 1, 6}, {3, 0, 2}, {3, 1, 6}, {4, 0, 1}, {3, 2, 10}}},
         {41, {{1, 0, 2}, {2, 0, 2}, {2, 1, 6}, {3, 0, 2}, {3, 1, 6}, {4, 0, 2}, {3, 2, 10}, {4, 1, 6}, {5, 0, 1}, {4, 2, 4}}},
         {42, {{1, 0, 2}, {2, 0, 2}, {2, 1, 6}, {3, 0, 2}, {3, 1, 6}, {4, 0, 1}, {3, 2, 10}, {4, 1, 6}, {5, 0, 1}, {4, 2, 5}}}};
+}
+
+SourceRecord internalBenchmarkSource() {
+    return {"internal-benchmark", "Internal validation benchmarks", "quantum_atom_tests", "1", "", ""};
+}
+
+SourceRecord codataSource() {
+    return {"codata-const", "CODATA constants embedded in source", "internal", "2026-mvp", "", ""};
+}
+
+MethodStamp makeHydrogenicMethodStamp(int nuclearCharge, double zeff, bool useReducedMass) {
+    MethodStamp stamp;
+    stamp.methodName = useReducedMass ? "Reduced-mass corrected hydrogenic analytic model"
+                                      : "Hydrogenic analytic model";
+    stamp.approximation = (std::abs(zeff - static_cast<double>(nuclearCharge)) < 1.0e-6)
+                              ? "single-electron analytic model"
+                              : "effective-charge hydrogenic estimate";
+    stamp.dataSource = "Embedded CODATA constants";
+    stamp.validationSummary = "Analytic closed-form expressions with H/He+ regression checks";
+    stamp.tier = ModelTier::Tier0Teaching;
+    stamp.animationKind = AnimationKind::None;
+    if (std::abs(zeff - static_cast<double>(nuclearCharge)) >= 1.0e-6) {
+        stamp.caveats.push_back("Using Z_eff instead of the full nuclear charge is a teaching approximation.");
+    }
+    if (useReducedMass) {
+        stamp.caveats.push_back("Reduced-mass correction is applied.");
+    }
+    return stamp;
+}
+
+MethodStamp makeTransitionMethodStamp(const TransitionRequest& request) {
+    MethodStamp stamp = makeHydrogenicMethodStamp(request.nuclearCharge, request.initialZeff, request.useReducedMass);
+    stamp.methodName = "Hydrogenic transition and spectral observable evaluation";
+    stamp.validationSummary = "Canonical hydrogen lines are regression-tested locally";
+    if (request.rules == TransitionRuleSet::ElectricDipole) {
+        stamp.caveats.push_back("E1 selection rules are enforced.");
+    } else {
+        stamp.caveats.push_back("Selection rules are disabled for this result.");
+    }
+    return stamp;
+}
+
+MethodStamp makeConfigurationMethodStamp(bool usedExceptionRule) {
+    MethodStamp stamp;
+    stamp.methodName = "Aufbau-Pauli electron configuration builder";
+    stamp.approximation = "teaching configuration builder";
+    stamp.dataSource = "Built-in filling-order table";
+    stamp.validationSummary = "Selected light-element configurations are regression-tested locally";
+    stamp.tier = ModelTier::Tier0Teaching;
+    stamp.animationKind = AnimationKind::None;
+    stamp.caveats.push_back("This is not a self-consistent-field calculation.");
+    if (usedExceptionRule) {
+        stamp.caveats.push_back("A configured exception whitelist was applied.");
+    }
+    return stamp;
+}
+
+MethodStamp makeSlaterMethodStamp() {
+    MethodStamp stamp;
+    stamp.methodName = "Slater-rules effective charge estimate";
+    stamp.approximation = "Z_eff teaching approximation";
+    stamp.dataSource = "Built-in Slater shielding rules";
+    stamp.validationSummary = "Selected subshell benchmarks are regression-tested locally";
+    stamp.tier = ModelTier::Tier0Teaching;
+    stamp.animationKind = AnimationKind::None;
+    stamp.caveats.push_back("No explicit electron correlation or antisymmetrized many-electron wavefunction is solved.");
+    return stamp;
+}
+
+ValidationRecord makeNumericValidationRecord(const std::string& caseName,
+                                             const std::string& referenceName,
+                                             const std::string& units,
+                                             double referenceValue,
+                                             double measuredValue,
+                                             double tolerance,
+                                             const SourceRecord& source,
+                                             const std::string& notes = {}) {
+    ValidationRecord record;
+    record.caseName = caseName;
+    record.referenceName = referenceName;
+    record.units = units;
+    record.referenceValue = referenceValue;
+    record.measuredValue = measuredValue;
+    record.absoluteError = std::abs(measuredValue - referenceValue);
+    record.relativeError =
+        (std::abs(referenceValue) > 1.0e-30) ? (record.absoluteError / std::abs(referenceValue)) : 0.0;
+    record.status = (record.absoluteError <= tolerance) ? ValidationStatus::ReferenceMatched : ValidationStatus::SanityChecked;
+    record.notes = notes;
+    record.source = source;
+    return record;
+}
+
+ProvenanceRecord makeSpectrumProvenance(int nuclearCharge, const QuantumNumbers& initial, const QuantumNumbers& final) {
+    ProvenanceRecord provenance;
+    provenance.recordId = "analytic-spectrum-" + std::to_string(nuclearCharge) + "-" + std::to_string(initial.n) + "-" +
+                          std::to_string(initial.l) + "-" + std::to_string(final.n) + "-" + std::to_string(final.l);
+    provenance.sourceId = codataSource().id;
+    provenance.createdBy = "physics::generateSpectrum";
+    provenance.notes = "Derived from hydrogenic transition evaluation in the current build.";
+    return provenance;
+}
+
+ProvenanceRecord makeEnergyLevelProvenance(int nuclearCharge, int n) {
+    ProvenanceRecord provenance;
+    provenance.recordId = "analytic-energy-" + std::to_string(nuclearCharge) + "-" + std::to_string(n);
+    provenance.sourceId = codataSource().id;
+    provenance.createdBy = "physics::generateEnergyLevels";
+    provenance.notes = "Derived from hydrogenic energy evaluation in the current build.";
+    return provenance;
 }
 
 double radialWaveFunction(const QuantumNumbers& qn,
@@ -245,12 +362,32 @@ HydrogenicMetrics computeHydrogenicMetrics(int nuclearCharge,
     metrics.orbitalSpeedMps = speedMps;
     metrics.zeff = effectiveCharge;
     metrics.reducedMassFactor = muFactor;
-    (void)nuclearCharge;
+    metrics.method = makeHydrogenicMethodStamp(nuclearCharge, effectiveCharge, useReducedMass);
+    if (principalQuantumNumber == 1 && std::abs(effectiveCharge - static_cast<double>(nuclearCharge)) < 1.0e-6) {
+        if (nuclearCharge == 1) {
+            metrics.validation.push_back(makeNumericValidationRecord("H 1s energy",
+                                                                     "Hydrogenic benchmark",
+                                                                     "eV",
+                                                                     -13.605693122994,
+                                                                     metrics.energyEv,
+                                                                     5.0e-2,
+                                                                     internalBenchmarkSource()));
+        } else if (nuclearCharge == 2) {
+            metrics.validation.push_back(makeNumericValidationRecord("He+ 1s energy",
+                                                                     "Hydrogenic Z^2 benchmark",
+                                                                     "eV",
+                                                                     -54.422772491976,
+                                                                     metrics.energyEv,
+                                                                     2.0e-1,
+                                                                     internalBenchmarkSource()));
+        }
+    }
     return metrics;
 }
 
 TransitionResult computeTransition(const TransitionRequest& request) {
     TransitionResult result;
+    result.method = makeTransitionMethodStamp(request);
     if (!isValidQuantumNumbers(request.initial) || !isValidQuantumNumbers(request.final)) {
         result.allowed = false;
         result.reason = "量子数无效";
@@ -288,6 +425,16 @@ TransitionResult computeTransition(const TransitionRequest& request) {
     result.wavelengthM = constants::speedOfLight / std::max(result.frequencyHz, 1e-30);
     result.wavelengthNm = units::meterToNm(result.wavelengthM);
     result.seriesName = spectralSeriesName(request.final.n);
+    if (request.nuclearCharge == 1 && std::abs(request.initialZeff - 1.0) < 1.0e-6 &&
+        std::abs(request.finalZeff - 1.0) < 1.0e-6) {
+        if (request.initial.n == 2 && request.initial.l == 1 && request.final.n == 1 && request.final.l == 0) {
+            result.validation.push_back(makeNumericValidationRecord(
+                "Hydrogen Lyman-alpha", "Internal benchmark", "nm", 121.567, result.wavelengthNm, 0.15, internalBenchmarkSource()));
+        } else if (request.initial.n == 3 && request.initial.l == 1 && request.final.n == 2 && request.final.l == 0) {
+            result.validation.push_back(makeNumericValidationRecord(
+                "Hydrogen Balmer-alpha", "Internal benchmark", "nm", 656.279, result.wavelengthNm, 0.4, internalBenchmarkSource()));
+        }
+    }
     return result;
 }
 
@@ -305,7 +452,18 @@ std::vector<SpectrumLine> generateSpectrum(int nuclearCharge,
                 for (int lf = 0; lf < nf; ++lf) {
                     const TransitionResult transition = computeTransition(
                         {{ni, li, 0}, {nf, lf, 0}, rules, enforceDeltaM, nuclearCharge, zeff, zeff, nuclearMassKg, useReducedMass});
-                    lines.push_back({{ni, li, 0}, {nf, lf, 0}, transition.allowed, transition.wavelengthNm, transition.deltaEnergyEv, transition.seriesName});
+                    SpectrumLine line;
+                    line.initial = {ni, li, 0};
+                    line.final = {nf, lf, 0};
+                    line.allowed = transition.allowed;
+                    line.wavelengthNm = transition.wavelengthNm;
+                    line.photonEnergyEv = transition.deltaEnergyEv;
+                    line.seriesName = transition.seriesName;
+                    line.method = transition.method;
+                    line.validation = transition.validation;
+                    line.source = codataSource();
+                    line.provenance = makeSpectrumProvenance(nuclearCharge, line.initial, line.final);
+                    lines.push_back(std::move(line));
                 }
             }
         }
@@ -324,7 +482,16 @@ std::vector<EnergyLevelSample> generateEnergyLevels(int nuclearCharge,
     std::vector<EnergyLevelSample> levels;
     for (int n = 1; n <= maxN; ++n) {
         const auto metrics = computeHydrogenicMetrics(nuclearCharge, n, zeff, nuclearMassKg, useReducedMass);
-        levels.push_back({n, metrics.energyEv});
+        EnergyLevelSample sample;
+        sample.n = n;
+        sample.energyEv = metrics.energyEv;
+        sample.method = metrics.method;
+        if (!metrics.validation.empty()) {
+            sample.validation = metrics.validation.front();
+        }
+        sample.source = codataSource();
+        sample.provenance = makeEnergyLevelProvenance(nuclearCharge, n);
+        levels.push_back(std::move(sample));
     }
     return levels;
 }
@@ -334,6 +501,7 @@ ElectronConfigurationResult buildElectronConfiguration(int atomicNumber, int cha
     result.electronCount = std::max(0, atomicNumber - chargeState);
     if (result.electronCount == 0) {
         result.notation = "[bare nucleus]";
+        result.method = makeConfigurationMethodStamp(false);
         return result;
     }
 
@@ -368,6 +536,7 @@ ElectronConfigurationResult buildElectronConfiguration(int atomicNumber, int cha
         first = false;
     }
     result.notation = stream.str();
+    result.method = makeConfigurationMethodStamp(result.usedExceptionRule);
     return result;
 }
 
@@ -412,6 +581,11 @@ SlaterResult computeSlaterShielding(int atomicNumber,
 
     result.shieldingSigma = sigma;
     result.zeff = std::max(1e-3, static_cast<double>(atomicNumber) - sigma);
+    result.method = makeSlaterMethodStamp();
+    if (atomicNumber == 10 && targetN == 2 && targetL == 1) {
+        result.validation.push_back(makeNumericValidationRecord(
+            "Ne 2p Z_eff", "Internal benchmark", "", 5.85, result.zeff, 0.3, internalBenchmarkSource()));
+    }
     return result;
 }
 
