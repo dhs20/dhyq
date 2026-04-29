@@ -168,6 +168,36 @@ std::string localizeMethodPhrase(std::string_view phrase) {
     if (phrase == "phenomenological screened single-electron central field") return "现象学屏蔽单电子中心场";
     if (phrase == "analytic Coulomb central field") return "解析库仑中心场";
     if (phrase == "Tier 3 hydrogenic spectroscopy corrections") return "第三层氢样谱学修正";
+    if (phrase == "Pedagogical nuclear-process animation") return "教学型核过程动画";
+    if (phrase == "Semi-empirical liquid-drop binding estimate") return "半经验液滴模型结合能估计";
+    if (phrase == "Weizsacker semi-empirical mass formula without shell corrections") return "Weizsacker 半经验质量公式，不含壳层修正";
+    if (phrase == "Qualitative nuclear-structure trend model; not a shell-model or ab initio calculation.") {
+        return "用于定性核结构趋势，不是壳层模型或从头算核结构计算。";
+    }
+    if (phrase == "Gamow-like D-T fusion cross-section estimate") return "Gamow 型 D-T 聚变截面估计";
+    if (phrase == "Barrier-penetration-inspired phenomenological fit") return "受穿透势垒启发的现象学拟合";
+    if (phrase == "Qualitative D-T fusion cross-section curve; not a Bosch-Hale benchmark implementation.") {
+        return "用于定性展示 D-T 聚变截面曲线，不是 Bosch-Hale 基准实现。";
+    }
+    if (phrase == "Thermal U-235 fission cross-section estimate") return "U-235 热中子裂变截面估计";
+    if (phrase == "Low-energy 1/v law anchored at 0.0253 eV and 585 b") {
+        return "以 0.0253 eV、585 b 为锚点的低能 1/v 定律";
+    }
+    if (phrase == "Matches the thermal anchor point exactly; does not resolve epithermal resonance structure.") {
+        return "与热中子锚点一致，但不解析超热区共振结构。";
+    }
+    if (phrase == "Single-speed slab attenuation model") return "单速束流平板衰减模型";
+    if (phrase == "Beer-Lambert attenuation with a fixed microscopic cross section") {
+        return "使用固定微观截面的 Beer-Lambert 衰减";
+    }
+    if (phrase == "Solves time-dependent beam attenuation in a 1D slab, not full angular neutron transport.") {
+        return "求解一维平板中的时间依赖束流衰减，不是完整角分布中子输运。";
+    }
+    if (phrase == "Single-channel radioactive decay law") return "单道放射性衰变定律";
+    if (phrase == "Exponential rate equation without branching") return "不含分支比的指数率方程";
+    if (phrase == "Exact for a single constant decay rate; not a microscopic quantum many-body decay calculation.") {
+        return "对单一常数衰变率是精确的，但不是微观量子多体衰变计算。";
+    }
     if (phrase == "metadata import") return "元数据导入";
     if (phrase == "local reference mapping") return "本地参考映射";
     if (phrase == "single-electron analytic model") return "单电子解析模型";
@@ -197,6 +227,30 @@ std::string localizeMethodPhrase(std::string_view phrase) {
     }
     if (phrase == "Selected subshell benchmarks are regression-tested locally") {
         return "选定亚层基准已做本地回归测试";
+    }
+    if (phrase == "Preset particle choreography without nuclear reaction dynamics") {
+        return "预设粒子编排，不包含核反应动力学求解";
+    }
+    if (phrase == "Internal scene animation preset") {
+        return "内置场景动画预设";
+    }
+    if (phrase == "Illustrative only; no quantitative nuclear validation") {
+        return "仅作教学示意，未做定量核物理验证。";
+    }
+    if (phrase == "Scene preset selection") {
+        return "场景预设选择";
+    }
+    if (phrase == "strict hydrogenic teaching preset") {
+        return "严格氢样教学预设";
+    }
+    if (phrase == "multi-electron teaching preset") {
+        return "多电子教学预设";
+    }
+    if (phrase == "Built-in scripted scene preset") {
+        return "内置脚本化场景预设";
+    }
+    if (phrase == "Preset configures a pedagogical visualization, not a new physics solver.") {
+        return "该预设只配置教学可视化，不代表新增物理解算器。";
     }
     if (phrase == "Schema-level import without external online validation.") {
         return "仅做模式级导入，尚未接入外部在线校验。";
@@ -276,6 +330,9 @@ const char* validationStatusLabel(quantum::meta::ValidationStatus status) {
 }
 
 const char* currentAnimationLabel(const quantum::app::SimulationState& state) {
+    if (state.nuclearAnimation.enabled) {
+        return "教学型核过程演示动画";
+    }
     if (state.modelKind == quantum::app::ModelKind::WaveParticle) {
         return "教学演示动画";
     }
@@ -286,6 +343,65 @@ const char* currentAnimationLabel(const quantum::app::SimulationState& state) {
         return "脚本化示意相机动画";
     }
     return "静态可视化";
+}
+
+const char* nuclearAnimationModeLabel(quantum::app::NuclearAnimationMode mode) {
+    switch (mode) {
+    case quantum::app::NuclearAnimationMode::ParticleZoo:
+        return "基本粒子展示";
+    case quantum::app::NuclearAnimationMode::FusionDT:
+        return "聚变示意（D+T）";
+    case quantum::app::NuclearAnimationMode::FissionU235:
+        return "裂变示意（U-235）";
+    case quantum::app::NuclearAnimationMode::AlphaDecay:
+        return "α 衰变示意";
+    case quantum::app::NuclearAnimationMode::BetaMinusDecay:
+        return "β- 衰变示意";
+    case quantum::app::NuclearAnimationMode::BetaPlusDecay:
+        return "β+ 衰变示意";
+    case quantum::app::NuclearAnimationMode::None:
+    default:
+        return "关闭";
+    }
+}
+
+std::vector<const char*> nuclearParticleLegend(const quantum::app::SimulationState& state) {
+    using quantum::app::NuclearAnimationMode;
+    std::vector<const char*> labels;
+    switch (state.nuclearAnimation.mode) {
+    case NuclearAnimationMode::ParticleZoo:
+        labels = {"质子", "中子", "电子", "正电子", "μ 子", "反 μ 子", "光子", "电子中微子", "电子反中微子",
+                  "μ 中微子", "μ 反中微子", "π+", "π-", "α 粒子", "氘核", "氚核", "氦-3", "氦-4"};
+        break;
+    case NuclearAnimationMode::FusionDT:
+        labels = {"氘核", "氚核", "氦-4", "中子"};
+        if (state.nuclearAnimation.showSecondaryParticles) {
+            labels.push_back("光子");
+        }
+        break;
+    case NuclearAnimationMode::FissionU235:
+        labels = {"入射中子", "裂变碎片 A", "裂变碎片 B", "次级中子"};
+        if (state.nuclearAnimation.showSecondaryParticles) {
+            labels.push_back("光子");
+        }
+        break;
+    case NuclearAnimationMode::AlphaDecay:
+        labels = {"母核示意", "α 粒子"};
+        if (state.nuclearAnimation.showSecondaryParticles) {
+            labels.push_back("光子");
+        }
+        break;
+    case NuclearAnimationMode::BetaMinusDecay:
+        labels = {"核内质子/中子示意", "电子", "反中微子"};
+        break;
+    case NuclearAnimationMode::BetaPlusDecay:
+        labels = {"核内质子/中子示意", "正电子", "中微子"};
+        break;
+    case NuclearAnimationMode::None:
+    default:
+        break;
+    }
+    return labels;
 }
 
 void drawMethodTags(const quantum::app::SimulationState& state) {
@@ -313,6 +429,9 @@ void drawMethodTags(const quantum::app::SimulationState& state) {
     ImGui::TextWrapped("验证状态: %s",
                        strictHydrogenic ? "已做 H/He+ 解析值、跃迁和数值收敛验证"
                                         : "教学近似，仅做一致性与数值链路验证");
+    if (state.nuclearAnimation.enabled) {
+        ImGui::TextWrapped("核过程动画: %s，教学示意，不是核反应求解器", nuclearAnimationModeLabel(state.nuclearAnimation.mode));
+    }
     if (!state.derived.methodStamps.empty()) {
         ImGui::SeparatorText("当前激活方法");
         for (const auto& stamp : state.derived.methodStamps) {
@@ -337,7 +456,11 @@ void drawAnimationDisclosure(const quantum::app::SimulationState& state) {
     ImGui::TextWrapped("是否直接求解 TDSE/TD-CI: 否");
     ImGui::TextWrapped("是否存在外场驱动: 否");
     ImGui::TextWrapped("是否包含耗散: 否");
-    ImGui::TextWrapped("说明: 当前动画主要用于教学展示、相机过渡和基态/叠加态可视化，不应解释为真实时间依赖量子动力学。");
+    if (state.nuclearAnimation.enabled) {
+        ImGui::TextWrapped("核过程说明: 当前“%s”场景动画仍以教学示意为主；相关面板会给出简化的截面、衰减或衰变模型，但这里的画面本身不是完整核反应输运或微观核动力学求解。",
+                           nuclearAnimationModeLabel(state.nuclearAnimation.mode));
+    }
+    ImGui::TextWrapped("说明: 当前动画主要用于教学展示、相机过渡、核过程示意和基态/叠加态可视化，不应解释为真实时间依赖量子动力学。");
 }
 
 void drawValidationTable(const std::vector<quantum::meta::ValidationRecord>& records) {
@@ -467,6 +590,36 @@ void drawScenarioButtons(quantum::app::SimulationState& state) {
         state.cloud.components = {{{2, 1, 0}, 0.8, 0.0, 1.0}, {{2, 1, 1}, 0.6, 1.57, 1.0}};
         state.solver.qn = {2, 1, 0};
         markAllDirty(state);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("聚变演示")) {
+        state.demo.enabled = false;
+        state.demo.currentStepName = "手动";
+        state.demo.stepProgress = 0.0;
+        state.nuclearAnimation.enabled = true;
+        state.nuclearAnimation.mode = quantum::app::NuclearAnimationMode::FusionDT;
+        state.nuclearAnimation.speed = 1.0;
+        state.nuclearAnimation.scale = 1.0;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("裂变演示")) {
+        state.demo.enabled = false;
+        state.demo.currentStepName = "手动";
+        state.demo.stepProgress = 0.0;
+        state.nuclearAnimation.enabled = true;
+        state.nuclearAnimation.mode = quantum::app::NuclearAnimationMode::FissionU235;
+        state.nuclearAnimation.speed = 1.0;
+        state.nuclearAnimation.scale = 1.1;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("粒子展示")) {
+        state.demo.enabled = false;
+        state.demo.currentStepName = "手动";
+        state.demo.stepProgress = 0.0;
+        state.nuclearAnimation.enabled = true;
+        state.nuclearAnimation.mode = quantum::app::NuclearAnimationMode::ParticleZoo;
+        state.nuclearAnimation.speed = 1.0;
+        state.nuclearAnimation.scale = 1.0;
     }
 }
 
@@ -896,6 +1049,18 @@ void drawSceneStatusOverlay(const ImRect& rect,
     }
     if (state.derived.spectroscopy.applied) {
         stream << " | 谱学修正开启";
+    }
+    if (state.nuclearAnimation.enabled) {
+        stream << " | 核过程 " << nuclearAnimationModeLabel(state.nuclearAnimation.mode);
+        if (state.derived.nuclearCrossSection.valid) {
+            stream << " | σ " << state.derived.nuclearCrossSection.queryCrossSectionBarn << " b";
+        }
+        if (state.derived.nuclearTransport.valid) {
+            stream << " | 透射 " << state.derived.nuclearTransport.transmissionAtExit;
+        }
+        if (state.derived.nuclearDecay.valid && !state.derived.nuclearDecay.samples.empty()) {
+            stream << " | 剩余 " << state.derived.nuclearDecay.samples.back().parentFraction;
+        }
     }
     if (performance.cloudBuildInFlight) {
         stream << " | 云数据生成中" << animatedEllipsis();
@@ -1804,6 +1969,78 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
         ImGui::SliderFloat("点大小", &state.view.pointSize, 1.0f, 12.0f);
         ImGui::SliderFloat("曝光度", &state.view.exposure, 0.1f, 4.0f);
 
+        ImGui::SeparatorText("核过程教学动画");
+        ImGui::Checkbox("启用核过程演示", &state.nuclearAnimation.enabled);
+        if (ImGui::BeginCombo("过程类型", nuclearAnimationModeLabel(state.nuclearAnimation.mode))) {
+            for (const auto mode : {quantum::app::NuclearAnimationMode::ParticleZoo,
+                                    quantum::app::NuclearAnimationMode::FusionDT,
+                                    quantum::app::NuclearAnimationMode::FissionU235,
+                                    quantum::app::NuclearAnimationMode::AlphaDecay,
+                                    quantum::app::NuclearAnimationMode::BetaMinusDecay,
+                                    quantum::app::NuclearAnimationMode::BetaPlusDecay}) {
+                if (ImGui::Selectable(nuclearAnimationModeLabel(mode), mode == state.nuclearAnimation.mode)) {
+                    state.nuclearAnimation.mode = mode;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        const double nuclearSpeedMin = 0.2;
+        const double nuclearSpeedMax = 3.5;
+        ImGui::SliderScalar("动画速度", ImGuiDataType_Double, &state.nuclearAnimation.speed, &nuclearSpeedMin, &nuclearSpeedMax, "%.2f");
+        const double nuclearScaleMin = 0.4;
+        const double nuclearScaleMax = 3.0;
+        ImGui::SliderScalar("动画尺度", ImGuiDataType_Double, &state.nuclearAnimation.scale, &nuclearScaleMin, &nuclearScaleMax, "%.2f");
+        ImGui::Checkbox("显示次级粒子", &state.nuclearAnimation.showSecondaryParticles);
+        ImGui::Checkbox("显示粒子拖尾", &state.nuclearAnimation.showTrails);
+        ImGui::SeparatorText("核结构近似");
+        if (ImGui::SliderInt("结构 Z", &state.nuclearAnimation.structureAtomicNumber, 1, 118)) {
+            state.dirty.physics = true;
+        }
+        if (ImGui::SliderInt("结构 A", &state.nuclearAnimation.structureMassNumber, 2, 320)) {
+            state.dirty.physics = true;
+        }
+        if (ImGui::SliderInt("同位素链窗口", &state.nuclearAnimation.structureIsotopeWindow, 4, 40)) {
+            state.dirty.physics = true;
+        }
+
+        if (state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::FusionDT) {
+            const double fusionEnergyMin = 1.0;
+            const double fusionEnergyMax = 300.0;
+            if (ImGui::SliderScalar("D-T 碰撞能量 (keV)", ImGuiDataType_Double, &state.nuclearAnimation.fusionEnergyKev, &fusionEnergyMin, &fusionEnergyMax, "%.1f")) {
+                state.dirty.physics = true;
+            }
+        } else if (state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::FissionU235) {
+            const double neutronEnergyMin = 1.0e-4;
+            const double neutronEnergyMax = 20.0;
+            if (ImGui::SliderScalar("中子能量 (eV)", ImGuiDataType_Double, &state.nuclearAnimation.neutronEnergyEv, &neutronEnergyMin, &neutronEnergyMax, "%.4f")) {
+                state.dirty.physics = true;
+            }
+            const double densityScaleMin = 0.1;
+            const double densityScaleMax = 20.0;
+            if (ImGui::SliderScalar("靶数密度 (×1e28 /m^3)", ImGuiDataType_Double, &state.nuclearAnimation.targetNumberDensityScale, &densityScaleMin, &densityScaleMax, "%.2f")) {
+                state.dirty.physics = true;
+            }
+            const double slabMin = 0.01;
+            const double slabMax = 50.0;
+            if (ImGui::SliderScalar("靶厚度 (cm)", ImGuiDataType_Double, &state.nuclearAnimation.slabThicknessCm, &slabMin, &slabMax, "%.2f")) {
+                state.dirty.physics = true;
+            }
+        } else if (state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::AlphaDecay ||
+                   state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::BetaMinusDecay ||
+                   state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::BetaPlusDecay) {
+            const double halfLifeMin = 1.0e-6;
+            const double halfLifeMax = 1.0e6;
+            if (ImGui::SliderScalar("半衰期 (s)", ImGuiDataType_Double, &state.nuclearAnimation.decayHalfLifeSeconds, &halfLifeMin, &halfLifeMax, "%.6f")) {
+                state.dirty.physics = true;
+            }
+            const double observationMin = 1.0e-6;
+            const double observationMax = 1.0e7;
+            if (ImGui::SliderScalar("观测窗口 (s)", ImGuiDataType_Double, &state.nuclearAnimation.decayObservationWindowSeconds, &observationMin, &observationMax, "%.6f")) {
+                state.dirty.physics = true;
+            }
+        }
+        ImGui::TextWrapped("说明：场景动画仍是教学可视化；下方物理与图表面板会提供简化核结构、截面、束流衰减和衰变率方程结果。");
+
         ImGui::SeparatorText("量子态叠加");
         for (std::size_t index = 0; index < state.cloud.components.size(); ++index) {
             auto& component = state.cloud.components[index];
@@ -1958,6 +2195,68 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
             ImGui::Separator();
             ImGui::TextWrapped("%s", state.derived.approximationWarning.c_str());
         }
+        ImGui::SeparatorText("核过程动画");
+        ImGui::Text("状态: %s", state.nuclearAnimation.enabled ? "已启用" : "未启用");
+        if (state.nuclearAnimation.enabled) {
+            ImGui::Text("当前过程: %s", nuclearAnimationModeLabel(state.nuclearAnimation.mode));
+            ImGui::Text("速度 / 尺度: %.2f / %.2f", state.nuclearAnimation.speed, state.nuclearAnimation.scale);
+            const auto particleLegend = nuclearParticleLegend(state);
+            if (!particleLegend.empty()) {
+                std::string particleText;
+                for (std::size_t index = 0; index < particleLegend.size(); ++index) {
+                    if (index > 0) {
+                        particleText += "、";
+                    }
+                    particleText += particleLegend[index];
+                }
+                ImGui::TextWrapped("示意粒子: %s", particleText.c_str());
+            }
+            if (state.derived.nuclearCrossSection.valid) {
+                const char* energyUnit =
+                    (state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::FusionDT) ? "keV" : "eV";
+                const double queryEnergy =
+                    (state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::FusionDT)
+                        ? (state.derived.nuclearCrossSection.queryEnergyEv / 1.0e3)
+                        : state.derived.nuclearCrossSection.queryEnergyEv;
+                const double peakEnergy =
+                    (state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::FusionDT)
+                        ? (state.derived.nuclearCrossSection.peakEnergyEv / 1.0e3)
+                        : state.derived.nuclearCrossSection.peakEnergyEv;
+                ImGui::Text("当前截面 sigma(E) = %.6f b", state.derived.nuclearCrossSection.queryCrossSectionBarn);
+                ImGui::Text("查询能量 = %.6f %s", queryEnergy, energyUnit);
+                ImGui::Text("曲线峰值 = %.6f b @ %.6f %s",
+                            state.derived.nuclearCrossSection.peakCrossSectionBarn,
+                            peakEnergy,
+                            energyUnit);
+            }
+            if (state.derived.nuclearTransport.valid) {
+                ImGui::Text("宏观截面 Sigma = %.6e 1/m", state.derived.nuclearTransport.macroscopicCrossSectionPerM);
+                ImGui::Text("平均自由程 = %.6e m", state.derived.nuclearTransport.meanFreePathM);
+                ImGui::Text("出射透射率 = %.6f", state.derived.nuclearTransport.transmissionAtExit);
+                ImGui::Text("出射反应概率 = %.6f", state.derived.nuclearTransport.reactedFractionAtExit);
+            }
+            if (state.derived.nuclearDecay.valid) {
+                ImGui::Text("半衰期 = %.6f s", state.derived.nuclearDecay.halfLifeSeconds);
+                ImGui::Text("衰变常数 = %.6e 1/s", state.derived.nuclearDecay.decayConstantPerSecond);
+                ImGui::Text("平均寿命 = %.6f s", state.derived.nuclearDecay.meanLifetimeSeconds);
+                if (!state.derived.nuclearDecay.samples.empty()) {
+                    ImGui::Text("观测窗口末端剩余母核 = %.6f", state.derived.nuclearDecay.samples.back().parentFraction);
+                }
+            }
+            ImGui::TextWrapped("物理边界: 当前核面板提供的是半经验核结构、低保真截面、束流衰减和单道衰变率方程；不是完整核结构、核数据库、输运求解或真实量子多体动力学。");
+        }
+        ImGui::SeparatorText("核结构近似");
+        ImGui::Text("结构核素: Z=%d, A=%d, N=%d",
+                    state.derived.nuclearStructure.protonNumber,
+                    state.derived.nuclearStructure.massNumber,
+                    state.derived.nuclearStructure.neutronNumber);
+        ImGui::Text("结合能 = %.6f MeV", state.derived.nuclearStructure.bindingEnergyMeV);
+        ImGui::Text("每核子结合能 = %.6f MeV", state.derived.nuclearStructure.bindingPerNucleonMeV);
+        ImGui::Text("半经验核半径 = %.6f fm", state.derived.nuclearStructure.radiusFm);
+        ImGui::Text("库仑 / 不对称 / 配对项 = %.6f / %.6f / %.6f MeV",
+                    state.derived.nuclearStructure.coulombTermMeV,
+                    state.derived.nuclearStructure.asymmetryTermMeV,
+                    state.derived.nuclearStructure.pairingTermMeV);
         ImGui::SeparatorText("高阶修正与中心场");
         ImGui::Text("中心场模式: %s", state.solver.useScreenedCentralField ? "第一层屏蔽中心场" : "氢样库仑势");
         if (!state.derived.centralField.samples.empty()) {
@@ -2044,6 +2343,84 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
             errors.push_back(sample.errorEv);
         }
         drawPolylinePlot("求解收敛曲线（步长 pm）", grids, errors, convergenceSelectionIndex_, IM_COL32(255, 153, 102, 230), 220.0f, "步长 (pm)", "误差 (eV)");
+
+        std::vector<double> isotopeMassNumbers;
+        std::vector<double> bindingPerNucleon;
+        isotopeMassNumbers.reserve(state.derived.nuclearStructure.isotopeChain.size());
+        bindingPerNucleon.reserve(state.derived.nuclearStructure.isotopeChain.size());
+        for (const auto& sample : state.derived.nuclearStructure.isotopeChain) {
+            isotopeMassNumbers.push_back(static_cast<double>(sample.massNumber));
+            bindingPerNucleon.push_back(sample.bindingPerNucleonMeV);
+        }
+        if (isotopeMassNumbers.size() >= 2) {
+            drawPolylinePlot("核结构：同位素链结合能/核子",
+                             isotopeMassNumbers,
+                             bindingPerNucleon,
+                             nuclearStructureSelectionIndex_,
+                             IM_COL32(214, 120, 255, 230),
+                             220.0f,
+                             "质量数 A",
+                             "B/A (MeV)");
+        }
+
+        std::vector<double> nuclearEnergies;
+        std::vector<double> nuclearCrossSections;
+        nuclearEnergies.reserve(state.derived.nuclearCrossSection.samples.size());
+        nuclearCrossSections.reserve(state.derived.nuclearCrossSection.samples.size());
+        for (const auto& sample : state.derived.nuclearCrossSection.samples) {
+            nuclearEnergies.push_back((state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::FusionDT) ? (sample.energyEv / 1.0e3)
+                                                                                                                     : sample.energyEv);
+            nuclearCrossSections.push_back(sample.crossSectionBarn);
+        }
+        if (nuclearEnergies.size() >= 2) {
+            drawPolylinePlot("核反应截面",
+                             nuclearEnergies,
+                             nuclearCrossSections,
+                             nuclearCrossSectionSelectionIndex_,
+                             IM_COL32(255, 118, 88, 230),
+                             220.0f,
+                             (state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::FusionDT) ? "能量 (keV)"
+                                                                                                            : "能量 (eV)",
+                             "sigma (barn)");
+        }
+
+        std::vector<double> transportTimes;
+        std::vector<double> transportSurvival;
+        transportTimes.reserve(state.derived.nuclearTransport.samples.size());
+        transportSurvival.reserve(state.derived.nuclearTransport.samples.size());
+        for (const auto& sample : state.derived.nuclearTransport.samples) {
+            transportTimes.push_back(sample.timeSeconds * 1.0e6);
+            transportSurvival.push_back(sample.survivalFraction);
+        }
+        if (transportTimes.size() >= 2) {
+            drawPolylinePlot("核输运：束流存活率",
+                             transportTimes,
+                             transportSurvival,
+                             nuclearTransportSelectionIndex_,
+                             IM_COL32(102, 228, 188, 230),
+                             220.0f,
+                             "时间 (us)",
+                             "存活率");
+        }
+
+        std::vector<double> decayTimes;
+        std::vector<double> decayParent;
+        decayTimes.reserve(state.derived.nuclearDecay.samples.size());
+        decayParent.reserve(state.derived.nuclearDecay.samples.size());
+        for (const auto& sample : state.derived.nuclearDecay.samples) {
+            decayTimes.push_back(sample.timeSeconds);
+            decayParent.push_back(sample.parentFraction);
+        }
+        if (decayTimes.size() >= 2) {
+            drawPolylinePlot("核衰变：母核剩余比例",
+                             decayTimes,
+                             decayParent,
+                             nuclearDecaySelectionIndex_,
+                             IM_COL32(255, 214, 94, 230),
+                             220.0f,
+                             "时间 (s)",
+                             "母核比例");
+        }
         ImGui::SeparatorText("图表详情");
         const PlotViewState& energyView = plotViewState("能级图");
         const PlotViewState& spectrumView = plotViewState("谱线图");
@@ -2102,6 +2479,44 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
                         sample.radiusBohr,
                         sample.effectiveCharge,
                         sample.potentialHartree);
+        }
+        if (nuclearStructureSelectionIndex_ >= 0 &&
+            static_cast<std::size_t>(nuclearStructureSelectionIndex_) < state.derived.nuclearStructure.isotopeChain.size()) {
+            const auto& sample =
+                state.derived.nuclearStructure.isotopeChain[static_cast<std::size_t>(nuclearStructureSelectionIndex_)];
+            ImGui::Text("选中核结构点: A=%d, B=%.6f MeV, B/A=%.6f MeV",
+                        sample.massNumber,
+                        sample.bindingEnergyMeV,
+                        sample.bindingPerNucleonMeV);
+        }
+        if (nuclearCrossSectionSelectionIndex_ >= 0 &&
+            static_cast<std::size_t>(nuclearCrossSectionSelectionIndex_) < state.derived.nuclearCrossSection.samples.size()) {
+            const auto& sample =
+                state.derived.nuclearCrossSection.samples[static_cast<std::size_t>(nuclearCrossSectionSelectionIndex_)];
+            ImGui::Text("选中截面点: E=%.6f %s, sigma=%.6f b",
+                        (state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::FusionDT) ? (sample.energyEv / 1.0e3)
+                                                                                                        : sample.energyEv,
+                        (state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::FusionDT) ? "keV" : "eV",
+                        sample.crossSectionBarn);
+        }
+        if (nuclearTransportSelectionIndex_ >= 0 &&
+            static_cast<std::size_t>(nuclearTransportSelectionIndex_) < state.derived.nuclearTransport.samples.size()) {
+            const auto& sample =
+                state.derived.nuclearTransport.samples[static_cast<std::size_t>(nuclearTransportSelectionIndex_)];
+            ImGui::Text("选中输运点: t=%.6f us, x=%.6e m, 存活率=%.6f, 反应率=%.6f",
+                        sample.timeSeconds * 1.0e6,
+                        sample.positionM,
+                        sample.survivalFraction,
+                        sample.reactedFraction);
+        }
+        if (nuclearDecaySelectionIndex_ >= 0 &&
+            static_cast<std::size_t>(nuclearDecaySelectionIndex_) < state.derived.nuclearDecay.samples.size()) {
+            const auto& sample = state.derived.nuclearDecay.samples[static_cast<std::size_t>(nuclearDecaySelectionIndex_)];
+            ImGui::Text("选中衰变点: t=%.6f s, 母核=%.6f, 子核=%.6f, 活度比=%.6f",
+                        sample.timeSeconds,
+                        sample.parentFraction,
+                        sample.daughterFraction,
+                        sample.activityFraction);
         }
         if (state.derived.spectroscopy.applied) {
             ImGui::Text("当前跃迁修正前/后: ΔE %.6f -> %.6f eV, λ %.6f -> %.6f nm",

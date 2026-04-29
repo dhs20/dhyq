@@ -36,6 +36,10 @@ private:
     mutable int radialSelectionIndex_ = -1;
     mutable int centralFieldSelectionIndex_ = -1;
     mutable int convergenceSelectionIndex_ = -1;
+    mutable int nuclearStructureSelectionIndex_ = -1;
+    mutable int nuclearCrossSectionSelectionIndex_ = -1;
+    mutable int nuclearTransportSelectionIndex_ = -1;
+    mutable int nuclearDecaySelectionIndex_ = -1;
 };
 
 } // namespace quantum::ui

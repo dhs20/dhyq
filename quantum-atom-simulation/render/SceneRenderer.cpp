@@ -1,5 +1,6 @@
 #include "quantum/render/SceneRenderer.h"
 
+#include <glm/geometric.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -233,6 +234,271 @@ glm::mat3 normalMatrixFromModel(const glm::mat4& model) {
     return glm::transpose(glm::inverse(glm::mat3(model)));
 }
 
+enum class DemoParticleKind {
+    Proton,
+    Neutron,
+    Electron,
+    Positron,
+    Muon,
+    AntiMuon,
+    Photon,
+    Neutrino,
+    AntiNeutrino,
+    MuonNeutrino,
+    AntiMuonNeutrino,
+    PionPlus,
+    PionMinus,
+    Alpha,
+    Deuteron,
+    Triton,
+    Helium3,
+    Helium4,
+    FragmentA,
+    FragmentB
+};
+
+struct DemoParticleVisual {
+    DemoParticleKind kind = DemoParticleKind::Proton;
+    glm::vec3 position{0.0f};
+    glm::vec3 color{1.0f};
+    float radius = 0.08f;
+    float alpha = 1.0f;
+};
+
+float saturate(float value) {
+    return std::clamp(value, 0.0f, 1.0f);
+}
+
+float normalizedCycle(float timeSeconds, double speed, float durationSeconds = 6.0f) {
+    const float wrapped = std::fmod(timeSeconds * static_cast<float>(std::max(speed, 0.05)), durationSeconds);
+    return saturate(wrapped / std::max(durationSeconds, 1.0e-3f));
+}
+
+glm::vec3 lerpVec3(const glm::vec3& a, const glm::vec3& b, float t) {
+    return a * (1.0f - t) + b * t;
+}
+
+glm::vec3 particleColor(DemoParticleKind kind) {
+    switch (kind) {
+    case DemoParticleKind::Proton:
+        return {0.95f, 0.34f, 0.28f};
+    case DemoParticleKind::Neutron:
+        return {0.58f, 0.68f, 0.80f};
+    case DemoParticleKind::Electron:
+        return {0.38f, 0.82f, 1.00f};
+    case DemoParticleKind::Positron:
+        return {1.00f, 0.55f, 0.78f};
+    case DemoParticleKind::Muon:
+        return {0.34f, 0.92f, 0.64f};
+    case DemoParticleKind::AntiMuon:
+        return {0.86f, 0.62f, 1.00f};
+    case DemoParticleKind::Photon:
+        return {1.00f, 0.85f, 0.32f};
+    case DemoParticleKind::Neutrino:
+    case DemoParticleKind::AntiNeutrino:
+        return {0.68f, 1.00f, 0.86f};
+    case DemoParticleKind::MuonNeutrino:
+    case DemoParticleKind::AntiMuonNeutrino:
+        return {0.74f, 0.98f, 0.64f};
+    case DemoParticleKind::PionPlus:
+        return {1.00f, 0.67f, 0.38f};
+    case DemoParticleKind::PionMinus:
+        return {0.52f, 0.66f, 1.00f};
+    case DemoParticleKind::Alpha:
+        return {0.96f, 0.78f, 0.30f};
+    case DemoParticleKind::Deuteron:
+        return {0.98f, 0.62f, 0.22f};
+    case DemoParticleKind::Triton:
+        return {0.96f, 0.44f, 0.26f};
+    case DemoParticleKind::Helium3:
+    case DemoParticleKind::Helium4:
+        return {0.95f, 0.70f, 0.20f};
+    case DemoParticleKind::FragmentA:
+        return {0.78f, 0.53f, 0.94f};
+    case DemoParticleKind::FragmentB:
+        return {0.34f, 0.88f, 0.78f};
+    default:
+        return {0.85f, 0.85f, 0.85f};
+    }
+}
+
+float particleRadius(DemoParticleKind kind) {
+    switch (kind) {
+    case DemoParticleKind::Electron:
+    case DemoParticleKind::Positron:
+    case DemoParticleKind::Muon:
+    case DemoParticleKind::AntiMuon:
+    case DemoParticleKind::Photon:
+    case DemoParticleKind::Neutrino:
+    case DemoParticleKind::AntiNeutrino:
+    case DemoParticleKind::MuonNeutrino:
+    case DemoParticleKind::AntiMuonNeutrino:
+    case DemoParticleKind::PionPlus:
+    case DemoParticleKind::PionMinus:
+        return 0.04f;
+    case DemoParticleKind::Proton:
+    case DemoParticleKind::Neutron:
+        return 0.07f;
+    case DemoParticleKind::Alpha:
+        return 0.10f;
+    case DemoParticleKind::Deuteron:
+    case DemoParticleKind::Triton:
+        return 0.11f;
+    case DemoParticleKind::Helium3:
+    case DemoParticleKind::Helium4:
+        return 0.13f;
+    case DemoParticleKind::FragmentA:
+    case DemoParticleKind::FragmentB:
+        return 0.18f;
+    default:
+        return 0.08f;
+    }
+}
+
+void pushParticle(std::vector<DemoParticleVisual>& particles,
+                  DemoParticleKind kind,
+                  const glm::vec3& position,
+                  float scale,
+                  float alpha = 1.0f) {
+    particles.push_back({kind, position * scale, particleColor(kind), particleRadius(kind) * scale, alpha});
+}
+
+std::vector<DemoParticleVisual> buildNuclearAnimationVisuals(const quantum::app::SimulationState& state,
+                                                             float animationTimeSeconds) {
+    std::vector<DemoParticleVisual> particles;
+    if (!state.nuclearAnimation.enabled) {
+        return particles;
+    }
+
+    const float scale = static_cast<float>(std::clamp(state.nuclearAnimation.scale, 0.3, 4.0));
+    const float phase = normalizedCycle(animationTimeSeconds, state.nuclearAnimation.speed);
+
+    switch (state.nuclearAnimation.mode) {
+    case quantum::app::NuclearAnimationMode::ParticleZoo: {
+        const std::array<DemoParticleKind, 18> kinds{
+            DemoParticleKind::Proton,           DemoParticleKind::Neutron,        DemoParticleKind::Electron,
+            DemoParticleKind::Positron,         DemoParticleKind::Muon,           DemoParticleKind::AntiMuon,
+            DemoParticleKind::Photon,           DemoParticleKind::Neutrino,       DemoParticleKind::AntiNeutrino,
+            DemoParticleKind::MuonNeutrino,     DemoParticleKind::AntiMuonNeutrino,
+            DemoParticleKind::PionPlus,         DemoParticleKind::PionMinus,      DemoParticleKind::Alpha,
+            DemoParticleKind::Deuteron,         DemoParticleKind::Triton,         DemoParticleKind::Helium3,
+            DemoParticleKind::Helium4};
+        for (std::size_t index = 0; index < kinds.size(); ++index) {
+            const float angle = phase * 2.0f * static_cast<float>(quantum::physics::constants::pi) +
+                                static_cast<float>(index) * 0.55f;
+            const float radius = 1.0f + 0.16f * static_cast<float>(index % 4) + 0.05f * static_cast<float>(index / 6);
+            const float vertical = 0.22f * std::sin(angle * 1.7f + static_cast<float>(index)) +
+                                   0.12f * std::cos(angle * 0.9f + static_cast<float>(index) * 0.35f);
+            pushParticle(particles,
+                         kinds[index],
+                         {std::cos(angle) * radius, vertical, std::sin(angle) * radius},
+                         scale,
+                         0.96f);
+        }
+        break;
+    }
+    case quantum::app::NuclearAnimationMode::FusionDT: {
+        const float approach = saturate(phase / 0.38f);
+        const float after = saturate((phase - 0.42f) / 0.58f);
+        const float reactionStrength =
+            static_cast<float>(state.derived.nuclearCrossSection.valid
+                                   ? std::clamp(state.derived.nuclearCrossSection.queryCrossSectionBarn /
+                                                    std::max(state.derived.nuclearCrossSection.peakCrossSectionBarn, 1.0e-6),
+                                                0.0,
+                                                1.0)
+                                   : 0.45);
+        pushParticle(particles, DemoParticleKind::Deuteron, {lerpVec3({-2.3f, 0.0f, 0.0f}, {-0.25f, 0.0f, 0.0f}, approach).x, 0.0f, 0.0f}, scale);
+        pushParticle(particles, DemoParticleKind::Triton, {lerpVec3({2.3f, 0.0f, 0.0f}, {0.25f, 0.0f, 0.0f}, approach).x, 0.0f, 0.0f}, scale);
+        if (phase >= 0.40f) {
+            pushParticle(particles,
+                         DemoParticleKind::Helium4,
+                         {0.35f * after, 0.12f * after, 0.0f},
+                         scale,
+                         0.45f + 0.50f * reactionStrength);
+            pushParticle(particles,
+                         DemoParticleKind::Neutron,
+                         {1.0f + (1.6f + 1.4f * reactionStrength) * after, 0.18f, 0.0f},
+                         scale,
+                         0.55f + 0.40f * reactionStrength);
+            if (state.nuclearAnimation.showSecondaryParticles) {
+                pushParticle(particles,
+                             DemoParticleKind::Photon,
+                             {0.2f, 1.0f + (1.0f + 1.2f * reactionStrength) * after, 0.0f},
+                             scale,
+                             0.32f + 0.56f * reactionStrength);
+            }
+        }
+        break;
+    }
+    case quantum::app::NuclearAnimationMode::FissionU235: {
+        const float trigger = saturate(phase / 0.26f);
+        const float split = saturate((phase - 0.30f) / 0.70f);
+        const float reactionStrength =
+            static_cast<float>(state.derived.nuclearTransport.valid ? state.derived.nuclearTransport.reactedFractionAtExit : 0.65);
+        pushParticle(particles,
+                     DemoParticleKind::Neutron,
+                     {-2.4f + (1.6f + 0.7f * reactionStrength) * trigger, 0.0f, 0.0f},
+                     scale,
+                     0.45f + 0.45f * reactionStrength);
+        if (phase < 0.32f) {
+            pushParticle(particles, DemoParticleKind::FragmentA, {0.0f, 0.0f, 0.0f}, scale, 0.82f);
+        } else {
+            const float splitGain = 0.7f + 0.5f * reactionStrength;
+            pushParticle(particles, DemoParticleKind::FragmentA, {-1.2f * split * splitGain, 0.18f, 0.0f}, scale, 0.92f);
+            pushParticle(particles, DemoParticleKind::FragmentB, {1.45f * split * splitGain, -0.12f, 0.0f}, scale, 0.92f);
+            pushParticle(particles, DemoParticleKind::Neutron, {0.8f + 2.2f * split * splitGain, 0.75f, 0.0f}, scale, 0.72f + 0.20f * reactionStrength);
+            pushParticle(particles, DemoParticleKind::Neutron, {0.6f + 1.9f * split * splitGain, -0.82f, 0.0f}, scale, 0.72f + 0.20f * reactionStrength);
+            pushParticle(particles, DemoParticleKind::Neutron, {-0.3f - 1.7f * split * splitGain, 0.95f, 0.0f}, scale, 0.72f + 0.20f * reactionStrength);
+            if (state.nuclearAnimation.showSecondaryParticles) {
+                pushParticle(particles, DemoParticleKind::Photon, {0.0f, 1.0f + 1.9f * split, 0.0f}, scale, 0.30f + 0.52f * reactionStrength);
+            }
+        }
+        break;
+    }
+    case quantum::app::NuclearAnimationMode::AlphaDecay: {
+        const double observationTime =
+            phase * std::max(state.nuclearAnimation.decayObservationWindowSeconds, 1.0e-6);
+        const double lambda = 0.69314718055994530942 / std::max(state.nuclearAnimation.decayHalfLifeSeconds, 1.0e-9);
+        const float emission = static_cast<float>(1.0 - std::exp(-lambda * observationTime));
+        pushParticle(particles, DemoParticleKind::FragmentA, {0.0f, 0.0f, 0.0f}, scale, 0.82f - 0.30f * emission);
+        pushParticle(particles, DemoParticleKind::Alpha, {0.25f + 2.5f * emission, 0.25f + 1.2f * emission, 0.0f}, scale, 0.40f + 0.55f * emission);
+        if (state.nuclearAnimation.showSecondaryParticles) {
+            pushParticle(particles, DemoParticleKind::Photon, {-0.18f, 0.9f + 1.0f * emission, 0.0f}, scale, 0.24f + 0.45f * emission);
+        }
+        break;
+    }
+    case quantum::app::NuclearAnimationMode::BetaMinusDecay: {
+        const double observationTime =
+            phase * std::max(state.nuclearAnimation.decayObservationWindowSeconds, 1.0e-6);
+        const double lambda = 0.69314718055994530942 / std::max(state.nuclearAnimation.decayHalfLifeSeconds, 1.0e-9);
+        const float emission = static_cast<float>(1.0 - std::exp(-lambda * observationTime));
+        pushParticle(particles, DemoParticleKind::Proton, {0.0f, 0.0f, 0.0f}, scale, 0.82f - 0.24f * emission);
+        pushParticle(particles, DemoParticleKind::Electron, {0.35f + 2.2f * emission, -0.35f - 1.2f * emission, 0.0f}, scale, 0.35f + 0.60f * emission);
+        if (state.nuclearAnimation.showSecondaryParticles) {
+            pushParticle(particles, DemoParticleKind::AntiNeutrino, {-0.15f - 2.7f * emission, 0.55f + 1.1f * emission, 0.0f}, scale, 0.26f + 0.50f * emission);
+        }
+        break;
+    }
+    case quantum::app::NuclearAnimationMode::BetaPlusDecay: {
+        const double observationTime =
+            phase * std::max(state.nuclearAnimation.decayObservationWindowSeconds, 1.0e-6);
+        const double lambda = 0.69314718055994530942 / std::max(state.nuclearAnimation.decayHalfLifeSeconds, 1.0e-9);
+        const float emission = static_cast<float>(1.0 - std::exp(-lambda * observationTime));
+        pushParticle(particles, DemoParticleKind::Neutron, {0.0f, 0.0f, 0.0f}, scale, 0.82f - 0.24f * emission);
+        pushParticle(particles, DemoParticleKind::Positron, {-0.35f - 2.1f * emission, -0.30f - 1.0f * emission, 0.0f}, scale, 0.35f + 0.60f * emission);
+        if (state.nuclearAnimation.showSecondaryParticles) {
+            pushParticle(particles, DemoParticleKind::Neutrino, {0.20f + 2.6f * emission, 0.60f + 1.0f * emission, 0.0f}, scale, 0.26f + 0.50f * emission);
+        }
+        break;
+    }
+    case quantum::app::NuclearAnimationMode::None:
+    default:
+        break;
+    }
+
+    return particles;
+}
+
 } // namespace
 
 SceneRenderer::~SceneRenderer() {
@@ -383,6 +649,7 @@ SceneRenderStats SceneRenderer::render(const quantum::app::SimulationState& stat
         renderGrid(state, camera, view, projection);
     }
     renderNucleus(view, projection, animationTime);
+    renderNuclearAnimation(state, view, projection, animationTime);
     if (orbitPassEnabled) {
         renderOrbits(state, view, projection, animationTime);
     }
@@ -615,7 +882,30 @@ float SceneRenderer::estimateSceneExtent(const quantum::app::SimulationState& st
     const float orbitExtent = static_cast<float>(
         std::max(0.35, state.derived.bohrMetrics.orbitalRadiusM * kSceneScale * orbitScale));
     const float cloudExtent = std::max(0.0f, volumeExtent_ * kSceneScale);
-    return std::max({1.5f, orbitExtent * 1.8f, cloudExtent * 1.15f});
+    const float nuclearAnimationExtent = estimateNuclearAnimationExtent(state);
+    return std::max({1.5f, orbitExtent * 1.8f, cloudExtent * 1.15f, nuclearAnimationExtent});
+}
+
+float SceneRenderer::estimateNuclearAnimationExtent(const quantum::app::SimulationState& state) const {
+    if (!state.nuclearAnimation.enabled) {
+        return 0.0f;
+    }
+    const float scale = static_cast<float>(std::clamp(state.nuclearAnimation.scale, 0.3, 4.0));
+    switch (state.nuclearAnimation.mode) {
+    case quantum::app::NuclearAnimationMode::ParticleZoo:
+        return 3.4f * scale;
+    case quantum::app::NuclearAnimationMode::FusionDT:
+        return 4.1f * scale;
+    case quantum::app::NuclearAnimationMode::FissionU235:
+        return 5.2f * scale;
+    case quantum::app::NuclearAnimationMode::AlphaDecay:
+    case quantum::app::NuclearAnimationMode::BetaMinusDecay:
+    case quantum::app::NuclearAnimationMode::BetaPlusDecay:
+        return 3.8f * scale;
+    case quantum::app::NuclearAnimationMode::None:
+    default:
+        return 0.0f;
+    }
 }
 
 void SceneRenderer::configureCameraForScene(const quantum::app::SimulationState& state, OrbitCamera& camera) const {
@@ -704,6 +994,61 @@ void SceneRenderer::renderNucleus(const glm::mat4& view, const glm::mat4& projec
     glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), 0.95f, 0.26f, 0.21f);
     glUniform1f(glGetUniformLocation(meshShader_.id(), "uAlpha"), 1.0f);
     sphereMesh_.draw();
+}
+
+void SceneRenderer::renderNuclearAnimation(const quantum::app::SimulationState& state,
+                                           const glm::mat4& view,
+                                           const glm::mat4& projection,
+                                           float animationTimeSeconds) {
+    if (!state.nuclearAnimation.enabled || state.nuclearAnimation.mode == quantum::app::NuclearAnimationMode::None) {
+        return;
+    }
+
+    meshShader_.use();
+    glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uView"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uProjection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUniform3f(glGetUniformLocation(meshShader_.id(), "uLightDir"), -0.25f, 1.0f, 0.35f);
+
+    const float scale = static_cast<float>(std::clamp(state.nuclearAnimation.scale, 0.3, 4.0));
+    const float corePulse = 1.0f + 0.06f * std::sin(animationTimeSeconds * static_cast<float>(state.nuclearAnimation.speed) * 3.0f);
+    const glm::mat4 glowModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.24f * scale * corePulse));
+    glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uModel"), 1, GL_FALSE, glm::value_ptr(glowModel));
+    glUniformMatrix3fv(glGetUniformLocation(meshShader_.id(), "uNormalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrixFromModel(glowModel)));
+    glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), 1.0f, 0.78f, 0.28f);
+    glUniform1f(glGetUniformLocation(meshShader_.id(), "uAlpha"), 0.16f);
+    sphereMesh_.draw();
+
+    const auto particles = buildNuclearAnimationVisuals(state, animationTimeSeconds);
+    for (const auto& particle : particles) {
+        if (state.nuclearAnimation.showTrails) {
+            const glm::vec3 direction = particle.position;
+            const float length = glm::length(direction);
+            if (length > 0.35f) {
+                const glm::vec3 unit = direction / length;
+                for (int step = 1; step <= 4; ++step) {
+                    const float t = 1.0f - static_cast<float>(step) * 0.16f;
+                    const glm::vec3 trailPosition = particle.position * t - unit * 0.08f * static_cast<float>(step);
+                    const glm::mat4 trailModel =
+                        glm::translate(glm::mat4(1.0f), trailPosition) *
+                        glm::scale(glm::mat4(1.0f), glm::vec3(std::max(0.01f, particle.radius * (0.55f - 0.08f * static_cast<float>(step)))));
+                    glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uModel"), 1, GL_FALSE, glm::value_ptr(trailModel));
+                    glUniformMatrix3fv(glGetUniformLocation(meshShader_.id(), "uNormalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrixFromModel(trailModel)));
+                    glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), particle.color.r, particle.color.g, particle.color.b);
+                    glUniform1f(glGetUniformLocation(meshShader_.id(), "uAlpha"), particle.alpha * (0.16f - 0.025f * static_cast<float>(step)));
+                    sphereMesh_.draw();
+                }
+            }
+        }
+
+        const glm::mat4 particleModel =
+            glm::translate(glm::mat4(1.0f), particle.position) *
+            glm::scale(glm::mat4(1.0f), glm::vec3(std::max(0.01f, particle.radius)));
+        glUniformMatrix4fv(glGetUniformLocation(meshShader_.id(), "uModel"), 1, GL_FALSE, glm::value_ptr(particleModel));
+        glUniformMatrix3fv(glGetUniformLocation(meshShader_.id(), "uNormalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrixFromModel(particleModel)));
+        glUniform3f(glGetUniformLocation(meshShader_.id(), "uColor"), particle.color.r, particle.color.g, particle.color.b);
+        glUniform1f(glGetUniformLocation(meshShader_.id(), "uAlpha"), particle.alpha);
+        sphereMesh_.draw();
+    }
 }
 
 void SceneRenderer::renderOrbits(const quantum::app::SimulationState& state,

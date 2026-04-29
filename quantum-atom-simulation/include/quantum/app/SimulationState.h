@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "quantum/dynamics/NuclearPhysics.h"
 #include "quantum/meta/MethodMetadata.h"
 #include "quantum/physics/AtomicPhysics.h"
 #include "quantum/physics/CentralField.h"
@@ -37,6 +38,16 @@ enum class SamplingQualityPreset {
     Fast,
     Balanced,
     HighFidelity
+};
+
+enum class NuclearAnimationMode {
+    None,
+    ParticleZoo,
+    FusionDT,
+    FissionU235,
+    AlphaDecay,
+    BetaMinusDecay,
+    BetaPlusDecay
 };
 
 struct TransitionSelection {
@@ -94,6 +105,24 @@ struct ViewSettings {
     bool interactionActive = false;
     double fitTransitionSeconds = 0.65;
     bool fitLockTarget = false;
+};
+
+struct NuclearAnimationSettings {
+    bool enabled = false;
+    NuclearAnimationMode mode = NuclearAnimationMode::ParticleZoo;
+    bool showSecondaryParticles = true;
+    bool showTrails = true;
+    double speed = 1.0;
+    double scale = 1.0;
+    int structureAtomicNumber = 92;
+    int structureMassNumber = 235;
+    int structureIsotopeWindow = 12;
+    double fusionEnergyKev = 64.0;
+    double neutronEnergyEv = 0.0253;
+    double targetNumberDensityScale = 4.0;
+    double slabThicknessCm = 2.0;
+    double decayHalfLifeSeconds = 1.0;
+    double decayObservationWindowSeconds = 5.0;
 };
 
 struct ReferenceSettings {
@@ -165,6 +194,10 @@ struct DerivedData {
     quantum::physics::CloudData cloud;
     quantum::physics::CentralFieldProfile centralField;
     quantum::physics::NumericalSolverResult solver;
+    quantum::dynamics::NuclearStructureResult nuclearStructure;
+    quantum::dynamics::NuclearCrossSectionResult nuclearCrossSection;
+    quantum::dynamics::NuclearTransportResult nuclearTransport;
+    quantum::dynamics::NuclearDecayResult nuclearDecay;
     std::vector<quantum::meta::MethodStamp> methodStamps;
     std::vector<quantum::meta::ValidationRecord> validationRecords;
 };
@@ -188,6 +221,7 @@ struct SimulationState {
     SolverSettings solver;
     quantum::spectroscopy::SpectroscopySettings spectroscopy;
     ViewSettings view;
+    NuclearAnimationSettings nuclearAnimation;
     ReferenceSettings reference;
     ReportingSettings reporting;
     AutoDemoSettings demo;

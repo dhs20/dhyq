@@ -16,6 +16,8 @@
 - 严格氢样模型：能级、轨道半径、跃迁、谱线、约化质量修正
 - 多电子教学近似：Aufbau / Pauli / Hund + Slater `Z_eff`
 - 概率云可视化：点云、体切片、相位着色、叠加态、双阶段云构建
+- 核过程教学动画：粒子展示（质子/中子/电子/μ 子/π 介子等）与聚变/裂变/衰变示意
+- 低保真核物理模型：半经验核结构、D-T 截面估计、U-235 热中子裂变截面估计、平板束流衰减、单道衰变率方程
 - 数值求解：径向有限差分本征值法
 - Tier 1 中心场：可切换氢样库仑势或现象学屏蔽中心势
 - Tier 3 谱学修正：氢样精细结构、Zeeman、一阶受限 Stark 教学修正
@@ -117,6 +119,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -Configuration Re
 - Tier 1 屏蔽中心场是现象学模型，不应解释为自洽平均场
 - Tier 3 修正是氢样微扰扩展，不覆盖完整复杂原子谱学
 - 自动演示和场景动画不是时间依赖量子动力学
+- 核过程动画是教学可视化；相关核结构、截面、输运和衰变结果属于低保真近似，不是完整核数据库、核反应输运或真实量子多体动力学
 
 ## 相关文档
 
@@ -125,5 +128,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -Configuration Re
 - 架构设计：[design.md](/D:/project/dhyq/quantum-atom-simulation/design.md)
 - 模型说明：[docs/physics-model.md](/D:/project/dhyq/quantum-atom-simulation/docs/physics-model.md)
 - 验证说明：[docs/validation.md](/D:/project/dhyq/quantum-atom-simulation/docs/validation.md)
+- 当前能力与不足：[docs/current-status.md](/D:/project/dhyq/quantum-atom-simulation/docs/current-status.md)
 - 升级状态：[docs/upgrade-status.md](/D:/project/dhyq/quantum-atom-simulation/docs/upgrade-status.md)
 - Legacy 说明：[docs/legacy-prototype.md](/D:/project/dhyq/quantum-atom-simulation/docs/legacy-prototype.md)

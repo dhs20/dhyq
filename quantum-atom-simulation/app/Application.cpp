@@ -831,6 +831,76 @@ void Application::recomputeDerived() {
         state_.derived.centralField =
             quantum::physics::sampleCentralFieldProfile(centralField, state_.solver.maxScaledRadius, 160);
 
+        state_.nuclearAnimation.structureAtomicNumber = std::clamp(state_.nuclearAnimation.structureAtomicNumber, 1, 118);
+        state_.nuclearAnimation.structureMassNumber =
+            std::max(state_.nuclearAnimation.structureAtomicNumber + 1, state_.nuclearAnimation.structureMassNumber);
+        state_.nuclearAnimation.structureIsotopeWindow = std::clamp(state_.nuclearAnimation.structureIsotopeWindow, 4, 40);
+        state_.nuclearAnimation.fusionEnergyKev = std::clamp(state_.nuclearAnimation.fusionEnergyKev, 1.0, 300.0);
+        state_.nuclearAnimation.neutronEnergyEv = std::clamp(state_.nuclearAnimation.neutronEnergyEv, 1.0e-4, 20.0);
+        state_.nuclearAnimation.targetNumberDensityScale = std::clamp(state_.nuclearAnimation.targetNumberDensityScale, 0.1, 20.0);
+        state_.nuclearAnimation.slabThicknessCm = std::clamp(state_.nuclearAnimation.slabThicknessCm, 0.01, 50.0);
+        state_.nuclearAnimation.decayHalfLifeSeconds =
+            std::clamp(state_.nuclearAnimation.decayHalfLifeSeconds, 1.0e-6, 1.0e6);
+        state_.nuclearAnimation.decayObservationWindowSeconds =
+            std::clamp(state_.nuclearAnimation.decayObservationWindowSeconds, 1.0e-6, 1.0e7);
+
+        state_.derived.nuclearStructure = nuclearPhysics_.evaluateStructure(
+            {state_.nuclearAnimation.structureAtomicNumber,
+             state_.nuclearAnimation.structureMassNumber,
+             state_.nuclearAnimation.structureIsotopeWindow});
+        state_.derived.nuclearCrossSection = {};
+        state_.derived.nuclearTransport = {};
+        state_.derived.nuclearDecay = {};
+
+        if (state_.nuclearAnimation.enabled) {
+            switch (state_.nuclearAnimation.mode) {
+            case quantum::app::NuclearAnimationMode::FusionDT:
+                state_.derived.nuclearCrossSection = nuclearPhysics_.evaluateCrossSection(
+                    {quantum::dynamics::NuclearCrossSectionModel::DTFusionGamowLike,
+                     state_.nuclearAnimation.fusionEnergyKev * 1.0e3,
+                     1.0e3,
+                     3.0e5,
+                     220});
+                break;
+            case quantum::app::NuclearAnimationMode::FissionU235: {
+                state_.derived.nuclearCrossSection = nuclearPhysics_.evaluateCrossSection(
+                    {quantum::dynamics::NuclearCrossSectionModel::U235ThermalFissionOneOverV,
+                     state_.nuclearAnimation.neutronEnergyEv,
+                     1.0e-4,
+                     10.0,
+                     220});
+                const double thicknessM = state_.nuclearAnimation.slabThicknessCm * 1.0e-2;
+                const double speedEstimate =
+                    std::sqrt((2.0 * quantum::physics::units::evToJoule(state_.nuclearAnimation.neutronEnergyEv)) / 1.67492749804e-27);
+                const double observationTime = std::max(2.0e-8, 1.5 * thicknessM / std::max(speedEstimate, 1.0));
+                state_.derived.nuclearTransport = nuclearPhysics_.evaluateTransport(
+                    {state_.derived.nuclearCrossSection.queryCrossSectionBarn,
+                     state_.nuclearAnimation.neutronEnergyEv,
+                     state_.nuclearAnimation.targetNumberDensityScale * 1.0e28,
+                     thicknessM,
+                     observationTime,
+                     220});
+                break;
+            }
+            case quantum::app::NuclearAnimationMode::AlphaDecay:
+                state_.derived.nuclearDecay = nuclearPhysics_.evaluateDecay(
+                    {"alpha", state_.nuclearAnimation.decayHalfLifeSeconds, state_.nuclearAnimation.decayObservationWindowSeconds, 220});
+                break;
+            case quantum::app::NuclearAnimationMode::BetaMinusDecay:
+                state_.derived.nuclearDecay = nuclearPhysics_.evaluateDecay(
+                    {"beta-", state_.nuclearAnimation.decayHalfLifeSeconds, state_.nuclearAnimation.decayObservationWindowSeconds, 220});
+                break;
+            case quantum::app::NuclearAnimationMode::BetaPlusDecay:
+                state_.derived.nuclearDecay = nuclearPhysics_.evaluateDecay(
+                    {"beta+", state_.nuclearAnimation.decayHalfLifeSeconds, state_.nuclearAnimation.decayObservationWindowSeconds, 220});
+                break;
+            case quantum::app::NuclearAnimationMode::ParticleZoo:
+            case quantum::app::NuclearAnimationMode::None:
+            default:
+                break;
+            }
+        }
+
         state_.dirty.solver = true;
         state_.dirty.cloud = true;
     }
@@ -1274,9 +1344,27 @@ void Application::refreshMethodAndValidationMetadata() {
     appendMethod(state_.derived.spectroscopy.method);
     appendMethod(state_.derived.centralField.method);
     appendMethod(state_.derived.solver.method);
+    appendMethod(state_.derived.nuclearStructure.method);
+    appendMethod(state_.derived.nuclearCrossSection.method);
+    appendMethod(state_.derived.nuclearTransport.method);
+    appendMethod(state_.derived.nuclearDecay.method);
     if (const auto* elementMetadata = elementDatabase_.elementMetadataByAtomicNumber(state_.atomicNumber);
         elementMetadata != nullptr) {
         appendMethod(elementMetadata->method);
+    }
+    if (state_.nuclearAnimation.enabled) {
+        quantum::meta::MethodStamp nuclearAnimationStamp;
+        nuclearAnimationStamp.methodName = "Pedagogical nuclear-process animation";
+        nuclearAnimationStamp.approximation = "Preset particle choreography without nuclear reaction dynamics";
+        nuclearAnimationStamp.dataSource = "Internal scene animation preset";
+        nuclearAnimationStamp.validationSummary = "Illustrative only; no quantitative nuclear validation";
+        nuclearAnimationStamp.tier = quantum::meta::ModelTier::Tier0Teaching;
+        nuclearAnimationStamp.animationKind = quantum::meta::AnimationKind::Pedagogical;
+        nuclearAnimationStamp.isTimeDependent = false;
+        nuclearAnimationStamp.caveats = {"Not a nuclear structure solver.",
+                                         "Not a reaction cross-section or transport calculation.",
+                                         "Particle emission directions and yields are illustrative."};
+        appendMethod(nuclearAnimationStamp);
     }
     if ((state_.demo.enabled || state_.demo.useScriptPlayback) &&
         (currentDemoStep() != nullptr)) {
@@ -1301,6 +1389,10 @@ void Application::refreshMethodAndValidationMetadata() {
     appendRecords(state_.derived.spectroscopy.validation);
     appendRecords(state_.derived.centralField.validation);
     appendRecords(state_.derived.solver.validation);
+    appendRecords(state_.derived.nuclearStructure.validation);
+    appendRecords(state_.derived.nuclearCrossSection.validation);
+    appendRecords(state_.derived.nuclearTransport.validation);
+    appendRecords(state_.derived.nuclearDecay.validation);
     for (const auto& line : state_.derived.referenceLines) {
         appendRecords(line.validation);
     }
@@ -1384,7 +1476,8 @@ quantum::validation::ValidationReportInput Application::makeValidationReportInpu
             << ", central_field=" << (state_.solver.useScreenedCentralField ? "screened" : "hydrogenic")
             << ", fine=" << (state_.spectroscopy.applyFineStructure ? "on" : "off")
             << ", zeeman=" << (state_.spectroscopy.applyZeeman ? "on" : "off")
-            << ", stark=" << (state_.spectroscopy.applyStark ? "on" : "off");
+            << ", stark=" << (state_.spectroscopy.applyStark ? "on" : "off")
+            << ", nuclear_mode=" << static_cast<int>(state_.nuclearAnimation.mode);
     input.summary = summary.str();
     input.approximationWarning = state_.derived.approximationWarning;
 
@@ -1401,6 +1494,10 @@ quantum::validation::ValidationReportInput Application::makeValidationReportInpu
     appendNamedMethod("Tier 3 spectroscopy", state_.derived.spectroscopy.method);
     appendNamedMethod("Tier 1 central field", state_.derived.centralField.method);
     appendNamedMethod("Numerical solver", state_.derived.solver.method);
+    appendNamedMethod("Nuclear structure", state_.derived.nuclearStructure.method);
+    appendNamedMethod("Nuclear cross section", state_.derived.nuclearCrossSection.method);
+    appendNamedMethod("Nuclear transport", state_.derived.nuclearTransport.method);
+    appendNamedMethod("Nuclear decay kinetics", state_.derived.nuclearDecay.method);
     if (const auto* elementMetadata = elementDatabase_.elementMetadataByAtomicNumber(state_.atomicNumber);
         elementMetadata != nullptr) {
         appendNamedMethod("Element metadata", elementMetadata->method);

@@ -4,6 +4,7 @@
 #include "quantum/core/Logger.h"
 #include "quantum/core/Paths.h"
 #include "quantum/core/PerformanceTracker.h"
+#include "quantum/dynamics/NuclearPhysics.h"
 #include "quantum/meta/MethodMetadata.h"
 #include "quantum/physics/CloudGenerator.h"
 #include "quantum/physics/ElementDatabase.h"
@@ -120,6 +121,7 @@ private:
     quantum::core::Logger logger_;
     quantum::core::PerformanceTracker performance_;
     quantum::physics::ElementDatabase elementDatabase_;
+    quantum::dynamics::NuclearPhysicsEngine nuclearPhysics_;
     quantum::physics::ProbabilityCloudGenerator cloudGenerator_;
     quantum::physics::SchrodingerNumericalSolver numericalSolver_;
     quantum::render::OrbitCamera camera_;

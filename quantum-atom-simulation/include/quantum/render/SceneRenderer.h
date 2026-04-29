@@ -81,11 +81,16 @@ private:
     [[nodiscard]] LODDecision decideLod(const quantum::app::SimulationState& state, const OrbitCamera& camera) const;
     [[nodiscard]] VolumeSlicePlan chooseVolumeSlicePlan(const OrbitCamera& camera) const;
     [[nodiscard]] float estimateSceneExtent(const quantum::app::SimulationState& state) const;
+    [[nodiscard]] float estimateNuclearAnimationExtent(const quantum::app::SimulationState& state) const;
     void renderGrid(const quantum::app::SimulationState& state,
                     const OrbitCamera& camera,
                     const glm::mat4& view,
                     const glm::mat4& projection);
     void renderNucleus(const glm::mat4& view, const glm::mat4& projection, float animationTimeSeconds);
+    void renderNuclearAnimation(const quantum::app::SimulationState& state,
+                                const glm::mat4& view,
+                                const glm::mat4& projection,
+                                float animationTimeSeconds);
     void renderOrbits(const quantum::app::SimulationState& state,
                       const glm::mat4& view,
                       const glm::mat4& projection,

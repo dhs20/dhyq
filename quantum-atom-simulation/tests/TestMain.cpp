@@ -1,3 +1,4 @@
+#include "quantum/dynamics/NuclearPhysics.h"
 #include "quantum/physics/AtomicPhysics.h"
 #include "quantum/physics/CentralField.h"
 #include "quantum/physics/CloudGenerator.h"
@@ -317,6 +318,33 @@ int main() {
     expectTrue("Tier 3 spectroscopy method metadata", !correctedTransition.method.methodName.empty());
     expectTrue("Tier 3 spectroscopy validation", !correctedTransition.validation.empty());
     expectTrue("Tier 3 corrected wavelength positive", correctedTransition.correctedWavelengthNm > 0.0);
+
+    quantum::dynamics::NuclearPhysicsEngine nuclearEngine;
+    const auto iron56 = nuclearEngine.evaluateStructure({26, 56, 10});
+    expectTrue("Nuclear structure valid", iron56.valid);
+    expectNear("Fe-56 binding per nucleon", iron56.bindingPerNucleonMeV, 8.79, 0.8);
+    expectTrue("Nuclear structure method metadata", !iron56.method.methodName.empty());
+
+    const auto u235Fission = nuclearEngine.evaluateCrossSection(
+        {quantum::dynamics::NuclearCrossSectionModel::U235ThermalFissionOneOverV, 0.0253, 1.0e-4, 10.0, 128});
+    expectTrue("U-235 fission cross section valid", u235Fission.valid);
+    expectNear("U-235 thermal anchor", u235Fission.queryCrossSectionBarn, 585.0, 1.0e-6);
+    expectTrue("U-235 validation metadata", !u235Fission.validation.empty());
+
+    const auto dtFusion = nuclearEngine.evaluateCrossSection(
+        {quantum::dynamics::NuclearCrossSectionModel::DTFusionGamowLike, 64.0e3, 1.0e3, 3.0e5, 128});
+    expectTrue("D-T fusion cross section valid", dtFusion.valid);
+    expectTrue("D-T fusion cross section positive", dtFusion.queryCrossSectionBarn > 0.0);
+
+    const auto transport = nuclearEngine.evaluateTransport({1.0, 0.0253, 1.0e28, 1.0, 0.02, 128});
+    expectTrue("Transport valid", transport.valid);
+    expectNear("Transport mean free path", transport.meanFreePathM, 1.0, 1.0e-6);
+    expectNear("Transport transmission", transport.transmissionAtExit, std::exp(-1.0), 5.0e-3);
+
+    const auto decay = nuclearEngine.evaluateDecay({"alpha", 2.0, 4.0, 128});
+    expectTrue("Decay valid", decay.valid);
+    expectNear("Decay half-life consistency", std::exp(-decay.decayConstantPerSecond * 2.0), 0.5, 1.0e-9);
+    expectTrue("Decay validation metadata", !decay.validation.empty());
 
     quantum::validation::ValidationReportWriter reportWriter;
     quantum::validation::ValidationReportInput reportInput;
