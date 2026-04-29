@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 
 namespace quantum::spectroscopy {
 namespace {
@@ -33,6 +34,35 @@ double landeFactor(int l, double j) {
                      (2.0 * j * (j + 1.0));
 }
 
+std::string orbitalLetter(int l) {
+    switch (l) {
+    case 0:
+        return "S";
+    case 1:
+        return "P";
+    case 2:
+        return "D";
+    case 3:
+        return "F";
+    default:
+        return "L" + std::to_string(l);
+    }
+}
+
+std::string halfIntegerLabel(double value) {
+    const int twice = static_cast<int>(std::lround(2.0 * value));
+    if ((twice % 2) == 0) {
+        return std::to_string(twice / 2);
+    }
+    return std::to_string(twice) + "/2";
+}
+
+std::string termSymbol(const quantum::physics::QuantumNumbers& qn, double j, double f) {
+    std::ostringstream stream;
+    stream << qn.n << " ^2" << orbitalLetter(qn.l) << "_" << halfIntegerLabel(j) << " F=" << halfIntegerLabel(f);
+    return stream.str();
+}
+
 double fineStructureShiftEv(const quantum::physics::HydrogenicMetrics& metrics,
                             int nuclearCharge,
                             const quantum::physics::QuantumNumbers& qn,
@@ -40,6 +70,17 @@ double fineStructureShiftEv(const quantum::physics::HydrogenicMetrics& metrics,
     const double zAlpha = static_cast<double>(nuclearCharge) * quantum::physics::constants::fineStructureConstant;
     const double bracket = (1.0 / (j + 0.5)) - (3.0 / (4.0 * static_cast<double>(qn.n)));
     return metrics.energyEv * (zAlpha * zAlpha) * bracket / static_cast<double>(qn.n);
+}
+
+double hyperfineShiftEv(const quantum::physics::QuantumNumbers& qn,
+                        double nuclearSpin,
+                        double j,
+                        double f,
+                        double hyperfineAConstantMicroEv) {
+    const double contactScale = (qn.l == 0) ? 1.0 : 0.12;
+    const double aEv = hyperfineAConstantMicroEv * 1.0e-6 * contactScale /
+                       std::pow(static_cast<double>(std::max(qn.n, 1)), 3.0);
+    return 0.5 * aEv * (f * (f + 1.0) - nuclearSpin * (nuclearSpin + 1.0) - j * (j + 1.0));
 }
 
 double starkShiftEv(int nuclearCharge,
@@ -66,9 +107,9 @@ double starkShiftEv(int nuclearCharge,
 quantum::meta::MethodStamp makeCorrectionMethodStamp(const SpectroscopySettings& settings) {
     quantum::meta::MethodStamp stamp;
     stamp.methodName = "Tier 3 hydrogenic spectroscopy corrections";
-    stamp.approximation = "fine-structure + optional Zeeman + limited Stark estimate";
+    stamp.approximation = "fine-structure + optional Zeeman/Stark/hyperfine teaching estimates";
     stamp.dataSource = "Embedded perturbative formulas";
-    stamp.validationSummary = "Fine structure and Zeeman terms are perturbative teaching-level corrections.";
+    stamp.validationSummary = "Fine, Zeeman, Stark, and hyperfine terms are perturbative teaching-level corrections.";
     stamp.tier = quantum::meta::ModelTier::Tier3SpectroscopyCorrections;
     stamp.animationKind = quantum::meta::AnimationKind::None;
     stamp.includesRelativity = settings.applyFineStructure;
@@ -76,6 +117,9 @@ quantum::meta::MethodStamp makeCorrectionMethodStamp(const SpectroscopySettings&
     stamp.caveats.push_back("Spin is not solved dynamically; j-branch selection is user-controlled.");
     if (settings.applyStark) {
         stamp.caveats.push_back("Current Stark implementation is limited to a scalar 1s estimate.");
+    }
+    if (settings.applyHyperfine) {
+        stamp.caveats.push_back("Hyperfine splitting uses a scalar A-constant teaching estimate, not a full nuclear model.");
     }
     return stamp;
 }
@@ -88,7 +132,7 @@ SpectroscopyCorrectionResult evaluateHydrogenicCorrections(const quantum::physic
                                                            double nuclearMassKg) {
     SpectroscopyCorrectionResult result;
     result.method = makeCorrectionMethodStamp(settings);
-    result.applied = settings.applyFineStructure || settings.applyZeeman || settings.applyStark;
+    result.applied = settings.applyFineStructure || settings.applyZeeman || settings.applyStark || settings.applyHyperfine;
     if (!result.applied || !baseTransition.allowed) {
         result.notes = "No Tier 3 correction enabled or transition is forbidden.";
         return result;
@@ -103,10 +147,16 @@ SpectroscopyCorrectionResult evaluateHydrogenicCorrections(const quantum::physic
     result.final.j = selectJ(request.final.l, settings.finalBranch.lowerJBranch);
     result.initial.mJ = selectMJ(request.initial, result.initial.j);
     result.final.mJ = selectMJ(request.final, result.final.j);
+    result.initial.f = std::max(std::abs(settings.nuclearSpin - result.initial.j), settings.nuclearSpin + result.initial.j);
+    result.final.f = std::max(std::abs(settings.nuclearSpin - result.final.j), settings.nuclearSpin + result.final.j);
     result.initial.landeG = landeFactor(request.initial.l, result.initial.j);
     result.final.landeG = landeFactor(request.final.l, result.final.j);
     result.initial.correctedEnergyEv = initialMetrics.energyEv;
     result.final.correctedEnergyEv = finalMetrics.energyEv;
+    result.initial.termSymbol = termSymbol(request.initial, result.initial.j, result.initial.f);
+    result.final.termSymbol = termSymbol(request.final, result.final.j, result.final.f);
+    result.initialTermSymbol = result.initial.termSymbol;
+    result.finalTermSymbol = result.final.termSymbol;
 
     if (settings.applyFineStructure) {
         result.initial.fineStructureShiftEv =
@@ -126,11 +176,25 @@ SpectroscopyCorrectionResult evaluateHydrogenicCorrections(const quantum::physic
         result.final.starkShiftEv =
             starkShiftEv(request.nuclearCharge, request.final, settings.electricFieldVPerM, result.starkApproximationLimited);
     }
+    if (settings.applyHyperfine) {
+        result.initial.hyperfineShiftEv = hyperfineShiftEv(request.initial,
+                                                          settings.nuclearSpin,
+                                                          result.initial.j,
+                                                          result.initial.f,
+                                                          settings.hyperfineAConstantMicroEv);
+        result.final.hyperfineShiftEv = hyperfineShiftEv(request.final,
+                                                        settings.nuclearSpin,
+                                                        result.final.j,
+                                                        result.final.f,
+                                                        settings.hyperfineAConstantMicroEv);
+    }
 
     result.initial.totalShiftEv =
-        result.initial.fineStructureShiftEv + result.initial.zeemanShiftEv + result.initial.starkShiftEv;
+        result.initial.fineStructureShiftEv + result.initial.zeemanShiftEv + result.initial.starkShiftEv +
+        result.initial.hyperfineShiftEv;
     result.final.totalShiftEv =
-        result.final.fineStructureShiftEv + result.final.zeemanShiftEv + result.final.starkShiftEv;
+        result.final.fineStructureShiftEv + result.final.zeemanShiftEv + result.final.starkShiftEv +
+        result.final.hyperfineShiftEv;
     result.initial.correctedEnergyEv += result.initial.totalShiftEv;
     result.final.correctedEnergyEv += result.final.totalShiftEv;
     result.correctedDeltaEnergyEv = result.initial.correctedEnergyEv - result.final.correctedEnergyEv;

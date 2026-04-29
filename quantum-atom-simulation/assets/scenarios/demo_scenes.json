@@ -105,6 +105,72 @@
         "created_by": "assets",
         "notes": "Teaching approximation preset for multi-electron visualization."
       }
+    },
+    {
+      "name": "Helium Teaching SCF And CI",
+      "atomic_number": 2,
+      "charge_state": 0,
+      "approximation": "multi_electron_approximation",
+      "model": "compare",
+      "transition": { "initial": [2, 1, 0], "final": [1, 0, 0] },
+      "components": [
+        { "qn": [1, 0, 0], "amplitude": 0.9, "phase": 0.0 },
+        { "qn": [2, 0, 0], "amplitude": 0.35, "phase": 0.8 }
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "Tier 2/Tier 4 teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Preset highlights teaching mean-field and finite-basis CI outputs.",
+        "includes_electron_correlation": true,
+        "enforces_antisymmetry": true,
+        "includes_relativity": false,
+        "includes_external_field": false,
+        "is_time_dependent": false,
+        "caveats": [
+          "Mean-field and CI modules are teaching prototypes.",
+          "This preset does not imply research-grade HF or CI."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-he-scf-ci",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "Teaching mean-field and correlation preset."
+      }
+    },
+    {
+      "name": "Hydrogen Hyperfine Rabi",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "approximation": "strict_hydrogenic",
+      "model": "schrodinger_cloud",
+      "transition": { "initial": [2, 1, 0], "final": [1, 0, 0] },
+      "components": [
+        { "qn": [1, 0, 0], "amplitude": 0.8, "phase": 0.0 },
+        { "qn": [2, 1, 0], "amplitude": 0.6, "phase": 1.57 }
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "Tier 3/Tier 5 teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Preset highlights hyperfine labels and finite-basis two-level dynamics.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": true,
+        "includes_external_field": true,
+        "is_time_dependent": true,
+        "caveats": [
+          "Two-level dynamics is finite-basis teaching TDSE, not full TD-CI.",
+          "Hyperfine is a scalar A-constant estimate."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-h-hyperfine-rabi",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "Hyperfine and finite-basis dynamics teaching preset."
+      }
     }
   ]
 }

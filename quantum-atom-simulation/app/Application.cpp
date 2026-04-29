@@ -594,7 +594,13 @@ bool Application::initialize() {
         logger_.info("已从 assets/data/elements.json 加载元素数据库。");
     }
 
-    if (!elementDatabase_.loadReferenceTransitions(paths_.asset("data/nist_reference_lines.csv"))) {
+    if (!elementDatabase_.loadIsotopes(paths_.asset("data/isotopes.json"))) {
+        logger_.warn("未能加载本地同位素目录，核/同位素教学锚点将减少。");
+    }
+
+    if (elementDatabase_.loadReferenceTransitions(paths_.asset("data/reference_catalog.json"))) {
+        logger_.info("已从 assets/data/reference_catalog.json 加载离线参考谱线目录。");
+    } else if (!elementDatabase_.loadReferenceTransitions(paths_.asset("data/nist_reference_lines.csv"))) {
         logger_.warn("未能加载本地参考谱线映射，谱线对照将不可用。");
     }
 
@@ -809,6 +815,8 @@ void Application::recomputeDerived() {
                                                                           transitionRequest.rules,
                                                                           state_.transition.enforceDeltaM,
                                                                           state_.bohr.useReducedMass);
+        state_.derived.spectralRecords = spectralEngine_.build(
+            {state_.atomicNumber, state_.chargeState, state_.bohr.maxSpectrumN, state_.transition.enforceRules});
         state_.derived.energyLevels = quantum::physics::generateEnergyLevels(
             state_.atomicNumber, state_.bohr.maxSpectrumN, state_.derived.activeZeff, nuclearMass, state_.bohr.useReducedMass);
         state_.derived.radialDistribution = quantum::physics::sampleRadialDistribution(
@@ -830,6 +838,54 @@ void Application::recomputeDerived() {
         centralField.screeningLengthBohr = state_.solver.screeningLengthBohr;
         state_.derived.centralField =
             quantum::physics::sampleCentralFieldProfile(centralField, state_.solver.maxScaledRadius, 160);
+
+        if (state_.meanField.enabled) {
+            quantum::solvers::MeanFieldSolveRequest meanFieldRequest;
+            meanFieldRequest.atomicNumber = state_.atomicNumber;
+            meanFieldRequest.chargeState = state_.chargeState;
+            meanFieldRequest.configurationHint = state_.derived.configuration.notation;
+            meanFieldRequest.mode = state_.meanField.mode;
+            meanFieldRequest.maxIterations = state_.meanField.maxIterations;
+            meanFieldRequest.convergenceTolerance = state_.meanField.convergenceTolerance;
+            state_.derived.meanField = meanFieldSolver_.solve(meanFieldRequest);
+        } else {
+            state_.derived.meanField = {};
+        }
+
+        if (state_.correlation.enabled && state_.derived.meanField.converged) {
+            quantum::solvers::CorrelationSolveRequest correlationRequest;
+            correlationRequest.atomicNumber = state_.atomicNumber;
+            correlationRequest.chargeState = state_.chargeState;
+            correlationRequest.referenceEnergyEv = state_.derived.meanField.totalEnergyEv;
+            correlationRequest.orbitalEnergiesEv = state_.derived.meanField.orbitalEnergiesEv;
+            correlationRequest.couplingStrengthEv = state_.correlation.couplingStrengthEv;
+            state_.derived.correlation = correlationSolver_.solve(correlationRequest);
+        } else {
+            state_.derived.correlation = {};
+        }
+
+        if (state_.dynamics.enabled) {
+            quantum::dynamics::DynamicsRequest dynamicsRequest;
+            dynamicsRequest.modelLabel = "two-level TDSE teaching";
+            dynamicsRequest.totalTimeSeconds = state_.dynamics.totalTimeSeconds;
+            dynamicsRequest.timeStepSeconds = state_.dynamics.timeStepSeconds;
+            dynamicsRequest.externalFieldLabel = "classical resonant drive";
+            dynamicsRequest.couplingEv = state_.dynamics.couplingEv;
+            dynamicsRequest.detuningEv = state_.dynamics.detuningEv;
+            dynamicsRequest.includeDissipation = state_.dynamics.includeDissipation;
+            dynamicsRequest.dampingRatePerSecond = state_.dynamics.dampingRatePerSecond;
+            state_.derived.timeDynamics = dynamicsEngine_.propagate(dynamicsRequest);
+            if (state_.dynamics.syncCloudPhase && state_.cloud.components.size() >= 2 &&
+                !state_.derived.timeDynamics.dipoleExpectation.empty()) {
+                const double phase = std::atan2(state_.derived.timeDynamics.dipoleExpectation.back(),
+                                                state_.derived.timeDynamics.upperPopulation.back() -
+                                                    state_.derived.timeDynamics.lowerPopulation.back());
+                state_.cloud.components[1].phaseRadians = phase;
+                state_.dirty.cloud = true;
+            }
+        } else {
+            state_.derived.timeDynamics = {};
+        }
 
         state_.nuclearAnimation.structureAtomicNumber = std::clamp(state_.nuclearAnimation.structureAtomicNumber, 1, 118);
         state_.nuclearAnimation.structureMassNumber =
@@ -1172,6 +1228,49 @@ std::vector<std::filesystem::path> Application::exportCurrentPlotWindowCsv(const
                     }
                     writeRow(stream, "求解收敛曲线", "计算", index, "误差", stepPm, sample.errorEv);
                 }
+
+                for (std::size_t index = 0; index < state_.derived.meanField.residualHistory.size(); ++index) {
+                    const double iteration = static_cast<double>(index + 1);
+                    const double residual = state_.derived.meanField.residualHistory[index];
+                    if (iteration < state_.reporting.meanFieldPlotWindow.minX ||
+                        iteration > state_.reporting.meanFieldPlotWindow.maxX ||
+                        residual < state_.reporting.meanFieldPlotWindow.minY ||
+                        residual > state_.reporting.meanFieldPlotWindow.maxY) {
+                        continue;
+                    }
+                    writeRow(stream, "SCF 残差", "计算", index, "residual", iteration, residual);
+                }
+
+                for (std::size_t index = 0; index < state_.derived.correlation.components.size(); ++index) {
+                    const auto& component = state_.derived.correlation.components[index];
+                    const double x = static_cast<double>(index + 1);
+                    if (x < state_.reporting.correlationPlotWindow.minX ||
+                        x > state_.reporting.correlationPlotWindow.maxX ||
+                        component.weight < state_.reporting.correlationPlotWindow.minY ||
+                        component.weight > state_.reporting.correlationPlotWindow.maxY) {
+                        continue;
+                    }
+                    writeRow(stream,
+                             "CI 权重",
+                             "计算",
+                             index,
+                             component.label,
+                             x,
+                             component.weight,
+                             "energy_ev=" + std::to_string(component.energyEv));
+                }
+
+                for (std::size_t index = 0; index < state_.derived.timeDynamics.sampleTimes.size(); ++index) {
+                    const double timeFs = state_.derived.timeDynamics.sampleTimes[index] * 1.0e15;
+                    const double upper = state_.derived.timeDynamics.upperPopulation[index];
+                    if (timeFs < state_.reporting.dynamicsPlotWindow.minX ||
+                        timeFs > state_.reporting.dynamicsPlotWindow.maxX ||
+                        upper < state_.reporting.dynamicsPlotWindow.minY ||
+                        upper > state_.reporting.dynamicsPlotWindow.maxY) {
+                        continue;
+                    }
+                    writeRow(stream, "TD 布居", "计算", index, "upper", timeFs, upper);
+                }
             });
         };
 
@@ -1309,6 +1408,64 @@ std::vector<std::filesystem::path> Application::exportCurrentPlotWindowCsv(const
                 })) {
                 exportedPaths.push_back(convergencePath);
             }
+
+            const std::filesystem::path meanFieldPath = appendStemSuffix(baseOutputPath, "_mean_field");
+            if (exportSplitFile(meanFieldPath, [&](std::ofstream& stream) {
+                    for (std::size_t index = 0; index < state_.derived.meanField.residualHistory.size(); ++index) {
+                        const double iteration = static_cast<double>(index + 1);
+                        const double residual = state_.derived.meanField.residualHistory[index];
+                        if (iteration < state_.reporting.meanFieldPlotWindow.minX ||
+                            iteration > state_.reporting.meanFieldPlotWindow.maxX ||
+                            residual < state_.reporting.meanFieldPlotWindow.minY ||
+                            residual > state_.reporting.meanFieldPlotWindow.maxY) {
+                            continue;
+                        }
+                        writeRow(stream, "SCF 残差", "计算", index, "residual", iteration, residual);
+                    }
+                })) {
+                exportedPaths.push_back(meanFieldPath);
+            }
+
+            const std::filesystem::path correlationPath = appendStemSuffix(baseOutputPath, "_correlation");
+            if (exportSplitFile(correlationPath, [&](std::ofstream& stream) {
+                    for (std::size_t index = 0; index < state_.derived.correlation.components.size(); ++index) {
+                        const auto& component = state_.derived.correlation.components[index];
+                        const double x = static_cast<double>(index + 1);
+                        if (x < state_.reporting.correlationPlotWindow.minX ||
+                            x > state_.reporting.correlationPlotWindow.maxX ||
+                            component.weight < state_.reporting.correlationPlotWindow.minY ||
+                            component.weight > state_.reporting.correlationPlotWindow.maxY) {
+                            continue;
+                        }
+                        writeRow(stream,
+                                 "CI 权重",
+                                 "计算",
+                                 index,
+                                 component.label,
+                                 x,
+                                 component.weight,
+                                 "energy_ev=" + std::to_string(component.energyEv));
+                    }
+                })) {
+                exportedPaths.push_back(correlationPath);
+            }
+
+            const std::filesystem::path dynamicsPath = appendStemSuffix(baseOutputPath, "_dynamics");
+            if (exportSplitFile(dynamicsPath, [&](std::ofstream& stream) {
+                    for (std::size_t index = 0; index < state_.derived.timeDynamics.sampleTimes.size(); ++index) {
+                        const double timeFs = state_.derived.timeDynamics.sampleTimes[index] * 1.0e15;
+                        const double upper = state_.derived.timeDynamics.upperPopulation[index];
+                        if (timeFs < state_.reporting.dynamicsPlotWindow.minX ||
+                            timeFs > state_.reporting.dynamicsPlotWindow.maxX ||
+                            upper < state_.reporting.dynamicsPlotWindow.minY ||
+                            upper > state_.reporting.dynamicsPlotWindow.maxY) {
+                            continue;
+                        }
+                        writeRow(stream, "TD 布居", "计算", index, "upper", timeFs, upper);
+                    }
+                })) {
+                exportedPaths.push_back(dynamicsPath);
+            }
         }
 
         return exportedPaths;
@@ -1342,8 +1499,12 @@ void Application::refreshMethodAndValidationMetadata() {
     appendMethod(state_.derived.bohrMetrics.method);
     appendMethod(state_.derived.transition.method);
     appendMethod(state_.derived.spectroscopy.method);
+    appendMethod(state_.derived.spectralRecords.method);
     appendMethod(state_.derived.centralField.method);
     appendMethod(state_.derived.solver.method);
+    appendMethod(state_.derived.meanField.method);
+    appendMethod(state_.derived.correlation.method);
+    appendMethod(state_.derived.timeDynamics.method);
     appendMethod(state_.derived.nuclearStructure.method);
     appendMethod(state_.derived.nuclearCrossSection.method);
     appendMethod(state_.derived.nuclearTransport.method);
@@ -1387,8 +1548,12 @@ void Application::refreshMethodAndValidationMetadata() {
     appendRecords(state_.derived.slater.validation);
     appendRecords(state_.derived.transition.validation);
     appendRecords(state_.derived.spectroscopy.validation);
+    appendRecords(state_.derived.spectralRecords.validation);
     appendRecords(state_.derived.centralField.validation);
     appendRecords(state_.derived.solver.validation);
+    appendRecords(state_.derived.meanField.validation);
+    appendRecords(state_.derived.correlation.validation);
+    appendRecords(state_.derived.timeDynamics.validation);
     appendRecords(state_.derived.nuclearStructure.validation);
     appendRecords(state_.derived.nuclearCrossSection.validation);
     appendRecords(state_.derived.nuclearTransport.validation);
@@ -1442,7 +1607,7 @@ void Application::refreshMethodAndValidationMetadata() {
             record.status = (error <= 0.5) ? quantum::meta::ValidationStatus::ReferenceMatched
                                            : quantum::meta::ValidationStatus::SanityChecked;
             record.caseName = "Local reference line comparison";
-            record.referenceName = "assets/data/nist_reference_lines.csv";
+            record.referenceName = "assets/data/reference_catalog.json";
             record.units = "nm";
             record.referenceValue = referenceIt->wavelengthNm;
             record.measuredValue = state_.derived.transition.wavelengthNm;
@@ -1450,9 +1615,9 @@ void Application::refreshMethodAndValidationMetadata() {
             record.relativeError =
                 (std::abs(referenceIt->wavelengthNm) > 1.0e-30) ? (error / std::abs(referenceIt->wavelengthNm)) : 0.0;
             record.notes = "Reference line matched by n and l quantum numbers only.";
-            record.source = {"local-reference-csv",
-                             "Local reference line CSV",
-                             "assets/data/nist_reference_lines.csv",
+            record.source = {"local-reference-catalog",
+                             "Local reference line catalog",
+                             "assets/data/reference_catalog.json",
                              "1",
                              "",
                              ""};
@@ -1474,9 +1639,13 @@ quantum::validation::ValidationReportInput Application::makeValidationReportInpu
             << ',' << state_.transition.final.l << ',' << state_.transition.final.m << "), solver=(" << state_.solver.qn.n
             << ',' << state_.solver.qn.l << ',' << state_.solver.qn.m << ')'
             << ", central_field=" << (state_.solver.useScreenedCentralField ? "screened" : "hydrogenic")
+            << ", mean_field=" << (state_.meanField.enabled ? "on" : "off")
+            << ", correlation=" << (state_.correlation.enabled ? "on" : "off")
+            << ", dynamics=" << (state_.dynamics.enabled ? "on" : "off")
             << ", fine=" << (state_.spectroscopy.applyFineStructure ? "on" : "off")
             << ", zeeman=" << (state_.spectroscopy.applyZeeman ? "on" : "off")
             << ", stark=" << (state_.spectroscopy.applyStark ? "on" : "off")
+            << ", hyperfine=" << (state_.spectroscopy.applyHyperfine ? "on" : "off")
             << ", nuclear_mode=" << static_cast<int>(state_.nuclearAnimation.mode);
     input.summary = summary.str();
     input.approximationWarning = state_.derived.approximationWarning;
@@ -1492,8 +1661,12 @@ quantum::validation::ValidationReportInput Application::makeValidationReportInpu
     appendNamedMethod("Hydrogenic metrics", state_.derived.bohrMetrics.method);
     appendNamedMethod("Transition model", state_.derived.transition.method);
     appendNamedMethod("Tier 3 spectroscopy", state_.derived.spectroscopy.method);
+    appendNamedMethod("Structured spectral records", state_.derived.spectralRecords.method);
     appendNamedMethod("Tier 1 central field", state_.derived.centralField.method);
     appendNamedMethod("Numerical solver", state_.derived.solver.method);
+    appendNamedMethod("Tier 2 mean field", state_.derived.meanField.method);
+    appendNamedMethod("Tier 4 correlation", state_.derived.correlation.method);
+    appendNamedMethod("Tier 5 dynamics", state_.derived.timeDynamics.method);
     appendNamedMethod("Nuclear structure", state_.derived.nuclearStructure.method);
     appendNamedMethod("Nuclear cross section", state_.derived.nuclearCrossSection.method);
     appendNamedMethod("Nuclear transport", state_.derived.nuclearTransport.method);
@@ -1957,7 +2130,7 @@ void Application::applyCloudBuildResult(CloudBuildOutput&& result) {
 
 void Application::loadReferenceLines() {
     state_.derived.referenceLines.clear();
-    for (const auto& record : elementDatabase_.referenceTransitions(state_.atomicNumber)) {
+    for (const auto& record : elementDatabase_.referenceTransitions(state_.atomicNumber, state_.chargeState)) {
         quantum::physics::SpectrumLine referenceLine;
         referenceLine.seriesName = record.label;
         referenceLine.initial.n = record.upper.n;

@@ -8,10 +8,15 @@
 - 波长与频率
 - 电偶极选择规则过滤
 - 本地参考 CSV 对照
+- 离线参考谱线 JSON catalog 对照，CSV 兼容回退
+- 氢样 fine structure 教学修正
+- Zeeman 教学修正
+- 受限 Stark 教学修正
+- hyperfine 标量 A 常数教学估计
+- term symbol / J / mJ / F 展示
 
-未实现：
+仍未实现：
 
-- fine structure
-- hyperfine
-- Zeeman / Stark
-- term symbol 体系
+- 复杂原子的完整 fine / hyperfine / Lamb / QED 求解
+- 高阶 Zeeman / Stark 矩阵对角化
+- 研究级 term system 与全量外部数据库联动

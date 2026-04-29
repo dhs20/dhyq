@@ -1,10 +1,15 @@
 #include "quantum/dynamics/NuclearPhysics.h"
+#include "quantum/dynamics/DynamicsEngine.h"
+#include "quantum/data/JsonDataProvider.h"
 #include "quantum/physics/AtomicPhysics.h"
 #include "quantum/physics/CentralField.h"
 #include "quantum/physics/CloudGenerator.h"
 #include "quantum/physics/ElementDatabase.h"
 #include "quantum/physics/NumericalSolver.h"
+#include "quantum/solvers/TeachingCorrelationSolver.h"
+#include "quantum/solvers/TeachingMeanFieldSolver.h"
 #include "quantum/spectroscopy/HydrogenicCorrections.h"
+#include "quantum/spectroscopy/HydrogenicSpectralEngine.h"
 #include "quantum/validation/ValidationReportWriter.h"
 
 #include <cmath>
@@ -90,10 +95,15 @@ int main() {
     const auto projectRoot = locateProjectRoot();
     const auto elementsPath = projectRoot / "assets" / "data" / "elements.json";
     const auto referencesPath = projectRoot / "assets" / "data" / "nist_reference_lines.csv";
+    const auto referenceCatalogPath = projectRoot / "assets" / "data" / "reference_catalog.json";
+    const auto isotopesPath = projectRoot / "assets" / "data" / "isotopes.json";
     if (!database.loadFromJson(elementsPath)) {
         database.loadBuiltInSubset();
     }
-    (void)database.loadReferenceTransitions(referencesPath);
+    (void)database.loadIsotopes(isotopesPath);
+    if (!database.loadReferenceTransitions(referenceCatalogPath)) {
+        (void)database.loadReferenceTransitions(referencesPath);
+    }
     const auto hydrogen = database.elementByAtomicNumber(1);
     const auto oganesson = database.elementByAtomicNumber(118);
     expectTrue("Element metadata method", !hydrogen.method.methodName.empty());
@@ -101,6 +111,8 @@ int main() {
     expectTrue("Periodic metadata coverage", oganesson.symbol == "Og");
     expectTrue("Hydrogen Chinese name", hydrogen.localizedNameZh == "氢");
     expectTrue("Oganesson Chinese name", !oganesson.localizedNameZh.empty());
+    const auto hydrogenIsotopes = database.isotopesForAtomicNumber(1);
+    expectTrue("Isotope teaching catalog", hydrogenIsotopes.size() >= 3);
 
     expectNear("Bohr radius", constants::bohrRadiusM, 5.29177210903e-11, 1e-20);
     expectNear("eV->J", units::evToJoule(13.6), 2.17896022224e-18, 1e-21);
@@ -138,6 +150,8 @@ int main() {
         expectTrue("Reference transition method metadata", !referenceTransitions.front().method.methodName.empty());
         expectTrue("Reference transition provenance", !referenceTransitions.front().provenance.recordId.empty());
     }
+    const auto hePlusReferenceTransitions = database.referenceTransitions(2, 1);
+    expectTrue("Reference catalog charge-state filter", !hePlusReferenceTransitions.empty());
 
     const auto neonConfig = buildElectronConfiguration(10, 0);
     expectTrue("Ne configuration", neonConfig.notation == "1s2 2s2 2p6");
@@ -318,6 +332,57 @@ int main() {
     expectTrue("Tier 3 spectroscopy method metadata", !correctedTransition.method.methodName.empty());
     expectTrue("Tier 3 spectroscopy validation", !correctedTransition.validation.empty());
     expectTrue("Tier 3 corrected wavelength positive", correctedTransition.correctedWavelengthNm > 0.0);
+    spectroscopySettings.applyHyperfine = true;
+    spectroscopySettings.hyperfineAConstantMicroEv = 5.87433;
+    const auto hyperfineTransition = quantum::spectroscopy::evaluateHydrogenicCorrections(
+        {{2, 1, 1}, {1, 0, 0}, TransitionRuleSet::ElectricDipole, true, 1, 1.0, 1.0, hydrogenMass, true},
+        lymanAlpha,
+        spectroscopySettings,
+        hydrogenMass);
+    expectTrue("Hyperfine spectroscopy applied", hyperfineTransition.applied);
+    expectTrue("Hyperfine term symbol", !hyperfineTransition.initialTermSymbol.empty());
+    expectTrue("Hyperfine shift contributes", std::abs(hyperfineTransition.final.hyperfineShiftEv) > 0.0);
+
+    quantum::spectroscopy::HydrogenicSpectralEngine spectralEngine;
+    const auto spectralRecords = spectralEngine.build({1, 0, 4, true});
+    expectTrue("Structured spectral records", !spectralRecords.transitions.empty());
+    expectTrue("Structured spectral provenance", !spectralRecords.transitions.front().provenance.recordId.empty());
+
+    quantum::solvers::TeachingMeanFieldSolver meanFieldSolver;
+    quantum::solvers::MeanFieldSolveRequest meanFieldRequest;
+    meanFieldRequest.atomicNumber = 2;
+    meanFieldRequest.chargeState = 0;
+    meanFieldRequest.mode = quantum::solvers::MeanFieldMode::SlaterExchange;
+    meanFieldRequest.maxIterations = 60;
+    meanFieldRequest.convergenceTolerance = 1.0e-6;
+    const auto meanField = meanFieldSolver.solve(meanFieldRequest);
+    expectTrue("Teaching mean-field converges", meanField.converged);
+    expectTrue("Teaching mean-field Tier 2", meanField.method.tier == quantum::meta::ModelTier::Tier2MeanField);
+    expectTrue("Teaching mean-field residual history", !meanField.residualHistory.empty());
+    expectTrue("Teaching mean-field exchange lowers energy", meanField.exchangeCorrectionEv <= 0.0);
+
+    quantum::solvers::TeachingCorrelationSolver correlationSolver;
+    const auto correlation =
+        correlationSolver.solve({2, 0, meanField.totalEnergyEv, meanField.orbitalEnergiesEv, 0.35});
+    expectTrue("Teaching correlation solved", correlation.solved);
+    expectTrue("Teaching correlation Tier 4", correlation.method.tier == quantum::meta::ModelTier::Tier4Correlation);
+    expectTrue("Teaching correlation lowers energy", correlation.correlatedEnergyEv <= correlation.uncorrelatedEnergyEv);
+    if (correlation.components.size() >= 2) {
+        expectNear("Teaching correlation weights", correlation.components[0].weight + correlation.components[1].weight, 1.0, 1.0e-12);
+    }
+
+    quantum::dynamics::TeachingDynamicsEngine dynamicsEngine;
+    const auto noFieldDynamics =
+        dynamicsEngine.propagate({"two-level", 2.0e-14, 1.0e-16, "", 0.0, 0.0, 0.0, false});
+    expectTrue("No-field dynamics solved", noFieldDynamics.solved);
+    expectNear("No-field upper population", noFieldDynamics.upperPopulation.back(), 0.0, 1.0e-12);
+    const auto rabiDynamics =
+        dynamicsEngine.propagate({"two-level", 2.0e-14, 1.0e-16, "drive", 0.18, 0.0, 0.0, false});
+    expectTrue("Rabi dynamics transfers population", rabiDynamics.upperPopulation.back() > 0.0);
+    const auto dampedDynamics =
+        dynamicsEngine.propagate({"two-level", 2.0e-14, 1.0e-16, "drive", 0.18, 0.0, 1.0e14, true});
+    expectTrue("Damped dynamics solved", dampedDynamics.solved);
+    expectTrue("Damped dynamics non-amplifying", dampedDynamics.upperPopulation.back() <= rabiDynamics.upperPopulation.back() + 1.0e-12);
 
     quantum::dynamics::NuclearPhysicsEngine nuclearEngine;
     const auto iron56 = nuclearEngine.evaluateStructure({26, 56, 10});

@@ -13,12 +13,15 @@ class ElementDatabase {
 public:
     bool loadFromJson(const std::filesystem::path& path);
     bool loadReferenceTransitions(const std::filesystem::path& path);
+    bool loadIsotopes(const std::filesystem::path& path);
     void loadBuiltInSubset();
 
     [[nodiscard]] const ElementRecord& elementByAtomicNumber(int atomicNumber) const;
     [[nodiscard]] const std::vector<ElementRecord>& elements() const;
     [[nodiscard]] const quantum::data::ElementRecord* elementMetadataByAtomicNumber(int atomicNumber) const;
+    [[nodiscard]] std::vector<quantum::data::IsotopeRecord> isotopesForAtomicNumber(int atomicNumber) const;
     [[nodiscard]] std::vector<quantum::data::TransitionRecord> referenceTransitions(int atomicNumber) const;
+    [[nodiscard]] std::vector<quantum::data::TransitionRecord> referenceTransitions(int atomicNumber, int chargeState) const;
 
 private:
     void rebuildIndex();

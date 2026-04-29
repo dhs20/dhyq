@@ -54,8 +54,12 @@
   - Slater `Z_eff`
 - 数值求解已接入径向有限差分本征值法
 - Tier 1 已接入现象学屏蔽中心场
-- Tier 3 已接入氢样精细结构、Zeeman、受限 Stark 教学修正
+- Tier 2 已接入教学级屏蔽 SCF、Slater 交换修正、标量相对论预览
+- Tier 3 已接入氢样精细结构、Zeeman、受限 Stark、超精细教学修正
+- Tier 4 已接入有限基双组态 CI mixing 教学原型
+- Tier 5 已接入二能级 TDSE / Rabi 教学求解
 - 元数据层已补到完整周期表 `Z=1..118`
+- 已新增离线参考谱线 JSON catalog 与同位素教学锚点
 - 118 个元素中文名已下沉到数据层：
   - [assets/data/elements.json](/D:/project/dhyq/quantum-atom-simulation/assets/data/elements.json)
 
@@ -99,7 +103,7 @@
 
 ### 数据与数据库
 
-- 当前参考谱线仍以本地 CSV 资产为主，不是完整外部数据库缓存层
+- 当前参考谱线以本地 JSON catalog 为主，并保留 CSV 回退；不是完整外部数据库缓存层
 - 虽然静态元数据已经覆盖 `Z=1..118`，但高精度物理能力并没有覆盖完整周期表
 
 ### 跨平台
@@ -114,26 +118,14 @@
 
 ## 尚未实现
 
-### Tier 2
+### 研究级高阶理论
 
-- Hartree
-- Hartree-Fock
-- Dirac-Fock
-- 自洽 SCF 迭代
-
-### Tier 4
-
-- CI
+- 研究级 Hartree-Fock / Dirac-Fock
+- DFT
+- 完整 CI
 - MCSCF / CASSCF
-- 严格多电子反对称多体波函数
-- 电子关联
-
-### Tier 5
-
-- 真实 TDSE
-- TD-CI
-- 外场驱动时间推进
-- 可验证的真实时间依赖量子动力学动画
+- 严格多电子反对称多体波函数与电子关联
+- 真实多体 TDSE / TD-CI / TDHF 外场驱动时间推进
 
 ## 需要持续保持诚实表达的边界
 

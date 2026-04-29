@@ -80,6 +80,18 @@ const char* samplingQualityLabel(quantum::app::SamplingQualityPreset preset) {
     }
 }
 
+const char* uiMeanFieldModeLabel(quantum::solvers::MeanFieldMode mode) {
+    switch (mode) {
+    case quantum::solvers::MeanFieldMode::SlaterExchange:
+        return "Slater 交换平均场";
+    case quantum::solvers::MeanFieldMode::ScalarRelativisticPreview:
+        return "标量相对论预览";
+    case quantum::solvers::MeanFieldMode::HartreeScreened:
+    default:
+        return "屏蔽 Hartree 教学 SCF";
+    }
+}
+
 const char* lodLabel(int lodLevel) {
     switch (lodLevel) {
     case 0:
@@ -168,6 +180,15 @@ std::string localizeMethodPhrase(std::string_view phrase) {
     if (phrase == "phenomenological screened single-electron central field") return "现象学屏蔽单电子中心场";
     if (phrase == "analytic Coulomb central field") return "解析库仑中心场";
     if (phrase == "Tier 3 hydrogenic spectroscopy corrections") return "第三层氢样谱学修正";
+    if (phrase == "Hydrogenic spectral record engine") return "氢样谱学记录引擎";
+    if (phrase == "Tier 2 teaching mean-field prototype") return "第二层教学平均场原型";
+    if (phrase == "Tier 4 finite-basis teaching CI prototype") return "第四层有限基 CI 教学原型";
+    if (phrase == "Tier 5 finite-basis two-level TDSE teaching solver") return "第五层有限基二能级 TDSE 教学求解器";
+    if (phrase == "screened Hartree-style scalar SCF teaching iteration") return "屏蔽 Hartree 风格标量 SCF 教学迭代";
+    if (phrase == "screened Hartree-style SCF with Slater-exchange teaching correction") return "带 Slater 交换教学修正的屏蔽 SCF";
+    if (phrase == "screened Hartree-style SCF with scalar-relativistic preview correction") return "带标量相对论预览修正的屏蔽 SCF";
+    if (phrase == "two-configuration mixing over mean-field orbital estimates") return "基于平均场轨道估计的双组态混合";
+    if (phrase == "closed-form Rabi dynamics in a two-state basis") return "二态基中的闭式 Rabi 动力学";
     if (phrase == "Pedagogical nuclear-process animation") return "教学型核过程动画";
     if (phrase == "Semi-empirical liquid-drop binding estimate") return "半经验液滴模型结合能估计";
     if (phrase == "Weizsacker semi-empirical mass formula without shell corrections") return "Weizsacker 半经验质量公式，不含壳层修正";
@@ -206,6 +227,9 @@ std::string localizeMethodPhrase(std::string_view phrase) {
     if (phrase == "Z_eff teaching approximation") return "Z_eff 教学近似";
     if (phrase == "fine-structure + optional Zeeman + limited Stark estimate") {
         return "精细结构 + 可选 Zeeman + 受限 Stark 估计";
+    }
+    if (phrase == "fine-structure + optional Zeeman/Stark/hyperfine teaching estimates") {
+        return "精细结构 + 可选 Zeeman/Stark/超精细教学估计";
     }
     if (phrase == "single-electron radial central-field solver on a uniform grid") {
         return "均匀网格上的单电子径向中心场求解";
@@ -260,6 +284,9 @@ std::string localizeMethodPhrase(std::string_view phrase) {
     }
     if (phrase == "Fine structure and Zeeman terms are perturbative teaching-level corrections.") {
         return "精细结构与 Zeeman 项目前仅作为微扰教学修正。";
+    }
+    if (phrase == "Fine, Zeeman, Stark, and hyperfine terms are perturbative teaching-level corrections.") {
+        return "精细结构、Zeeman、Stark 与超精细项目前仅作为微扰教学修正。";
     }
     if (phrase == "Phenomenological model used for qualitative central-field trends.") {
         return "该现象学模型仅用于定性展示中心场趋势。";
@@ -330,6 +357,9 @@ const char* validationStatusLabel(quantum::meta::ValidationStatus status) {
 }
 
 const char* currentAnimationLabel(const quantum::app::SimulationState& state) {
+    if (state.dynamics.enabled) {
+        return "有限基二能级时间依赖量子模拟";
+    }
     if (state.nuclearAnimation.enabled) {
         return "教学型核过程演示动画";
     }
@@ -2122,6 +2152,84 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
             }
         }
 
+        ImGui::SeparatorText("第二层：教学平均场");
+        if (ImGui::Checkbox("启用教学 SCF", &state.meanField.enabled)) {
+            state.dirty.physics = true;
+        }
+        if (state.meanField.enabled) {
+            if (ImGui::BeginCombo("平均场模式", uiMeanFieldModeLabel(state.meanField.mode))) {
+                for (const auto mode : {quantum::solvers::MeanFieldMode::HartreeScreened,
+                                        quantum::solvers::MeanFieldMode::SlaterExchange,
+                                        quantum::solvers::MeanFieldMode::ScalarRelativisticPreview}) {
+                    if (ImGui::Selectable(uiMeanFieldModeLabel(mode), mode == state.meanField.mode)) {
+                        state.meanField.mode = mode;
+                        state.dirty.physics = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::SliderInt("SCF 最大迭代", &state.meanField.maxIterations, 6, 120)) {
+                state.dirty.physics = true;
+            }
+            const double toleranceMin = 1.0e-8;
+            const double toleranceMax = 1.0e-3;
+            if (ImGui::SliderScalar("SCF 容差", ImGuiDataType_Double, &state.meanField.convergenceTolerance, &toleranceMin, &toleranceMax, "%.1e")) {
+                state.dirty.physics = true;
+            }
+        }
+
+        ImGui::SeparatorText("第四层：有限基关联");
+        if (ImGui::Checkbox("启用双组态 CI", &state.correlation.enabled)) {
+            state.dirty.physics = true;
+        }
+        if (state.correlation.enabled) {
+            const double couplingMin = 0.01;
+            const double couplingMax = 5.0;
+            if (ImGui::SliderScalar("组态耦合 (eV)", ImGuiDataType_Double, &state.correlation.couplingStrengthEv, &couplingMin, &couplingMax, "%.3f")) {
+                state.dirty.physics = true;
+            }
+        }
+
+        ImGui::SeparatorText("第五层：有限基时间动力学");
+        if (ImGui::Checkbox("启用二能级 TDSE", &state.dynamics.enabled)) {
+            state.dirty.physics = true;
+        }
+        if (state.dynamics.enabled) {
+            if (ImGui::Checkbox("同步到云相位", &state.dynamics.syncCloudPhase)) {
+                state.dirty.physics = true;
+            }
+            const double totalMin = 1.0e-16;
+            const double totalMax = 2.0e-12;
+            if (ImGui::SliderScalar("总时间 (s)", ImGuiDataType_Double, &state.dynamics.totalTimeSeconds, &totalMin, &totalMax, "%.2e")) {
+                state.dirty.physics = true;
+            }
+            const double stepMin = 1.0e-18;
+            const double stepMax = 5.0e-14;
+            if (ImGui::SliderScalar("时间步 (s)", ImGuiDataType_Double, &state.dynamics.timeStepSeconds, &stepMin, &stepMax, "%.2e")) {
+                state.dirty.physics = true;
+            }
+            const double couplingMin = 0.0;
+            const double couplingMax = 2.0;
+            if (ImGui::SliderScalar("驱动耦合 (eV)", ImGuiDataType_Double, &state.dynamics.couplingEv, &couplingMin, &couplingMax, "%.3f")) {
+                state.dirty.physics = true;
+            }
+            const double detuningMin = -2.0;
+            const double detuningMax = 2.0;
+            if (ImGui::SliderScalar("失谐 (eV)", ImGuiDataType_Double, &state.dynamics.detuningEv, &detuningMin, &detuningMax, "%.3f")) {
+                state.dirty.physics = true;
+            }
+            if (ImGui::Checkbox("加入阻尼包络", &state.dynamics.includeDissipation)) {
+                state.dirty.physics = true;
+            }
+            if (state.dynamics.includeDissipation) {
+                const double dampingMin = 0.0;
+                const double dampingMax = 2.0e15;
+                if (ImGui::SliderScalar("阻尼率 (1/s)", ImGuiDataType_Double, &state.dynamics.dampingRatePerSecond, &dampingMin, &dampingMax, "%.2e")) {
+                    state.dirty.physics = true;
+                }
+            }
+        }
+
         ImGui::SeparatorText("第三层：谱学修正");
         if (ImGui::Checkbox("精细结构修正", &state.spectroscopy.applyFineStructure)) {
             state.dirty.physics = true;
@@ -2149,6 +2257,21 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
             const double electricMin = 0.0;
             const double electricMax = 5.0e7;
             if (ImGui::SliderScalar("电场 E (V/m)", ImGuiDataType_Double, &state.spectroscopy.electricFieldVPerM, &electricMin, &electricMax)) {
+                state.dirty.physics = true;
+            }
+        }
+        if (ImGui::Checkbox("超精细修正", &state.spectroscopy.applyHyperfine)) {
+            state.dirty.physics = true;
+        }
+        if (state.spectroscopy.applyHyperfine) {
+            const double spinMin = 0.5;
+            const double spinMax = 4.5;
+            if (ImGui::SliderScalar("核自旋 I", ImGuiDataType_Double, &state.spectroscopy.nuclearSpin, &spinMin, &spinMax, "%.1f")) {
+                state.dirty.physics = true;
+            }
+            const double aMin = 0.0;
+            const double aMax = 30.0;
+            if (ImGui::SliderScalar("超精细 A (ueV)", ImGuiDataType_Double, &state.spectroscopy.hyperfineAConstantMicroEv, &aMin, &aMax, "%.3f")) {
                 state.dirty.physics = true;
             }
         }
@@ -2191,6 +2314,35 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
         ImGui::Text("求解能量 = %.6f eV", state.derived.solver.energyEv);
         ImGui::Text("求解误差 = %.6e eV", state.derived.solver.errorEv);
         ImGui::TextWrapped("求解状态: %s", state.derived.solver.message.c_str());
+        ImGui::SeparatorText("平均场、关联与动力学");
+        if (state.derived.meanField.iterations > 0) {
+            ImGui::Text("SCF 状态: %s, 迭代 %d, Z_eff=%.4f",
+                        state.derived.meanField.converged ? "收敛" : "未收敛",
+                        state.derived.meanField.iterations,
+                        state.derived.meanField.finalEffectiveCharge);
+            ImGui::Text("平均场总能 = %.6f eV", state.derived.meanField.totalEnergyEv);
+            if (std::abs(state.derived.meanField.exchangeCorrectionEv) > 0.0) {
+                ImGui::Text("Slater 交换修正 = %.6f eV", state.derived.meanField.exchangeCorrectionEv);
+            }
+            if (std::abs(state.derived.meanField.scalarRelativisticCorrectionEv) > 0.0) {
+                ImGui::Text("标量相对论预览修正 = %.6f eV", state.derived.meanField.scalarRelativisticCorrectionEv);
+            }
+        } else {
+            ImGui::TextWrapped("第二层教学平均场未启用。");
+        }
+        if (state.derived.correlation.solved) {
+            ImGui::Text("CI 相关能 = %.6f eV", state.derived.correlation.correlationEnergyEv);
+            ImGui::Text("相关后能量 = %.6f eV", state.derived.correlation.correlatedEnergyEv);
+        } else {
+            ImGui::TextWrapped("第四层有限基关联未启用或等待平均场收敛。");
+        }
+        if (state.derived.timeDynamics.solved && !state.derived.timeDynamics.upperPopulation.empty()) {
+            ImGui::Text("TDSE 样本数 = %zu", state.derived.timeDynamics.sampleTimes.size());
+            ImGui::Text("末态上能级布居 = %.6f", state.derived.timeDynamics.upperPopulation.back());
+            ImGui::Text("末态偶极观测量 = %.6f", state.derived.timeDynamics.dipoleExpectation.back());
+        } else {
+            ImGui::TextWrapped("第五层有限基时间动力学未启用。");
+        }
         if (!state.derived.approximationWarning.empty()) {
             ImGui::Separator();
             ImGui::TextWrapped("%s", state.derived.approximationWarning.c_str());
@@ -2273,8 +2425,11 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
         if (state.derived.spectroscopy.applied) {
             ImGui::Text("修正后 Delta E = %.6f eV", state.derived.spectroscopy.correctedDeltaEnergyEv);
             ImGui::Text("修正后 lambda = %.6f nm", state.derived.spectroscopy.correctedWavelengthNm);
-            ImGui::Text("初态 j/m_j = %.1f / %.1f", state.derived.spectroscopy.initial.j, state.derived.spectroscopy.initial.mJ);
-            ImGui::Text("末态 j/m_j = %.1f / %.1f", state.derived.spectroscopy.final.j, state.derived.spectroscopy.final.mJ);
+            ImGui::Text("初态 j/m_j/F = %.1f / %.1f / %.1f", state.derived.spectroscopy.initial.j, state.derived.spectroscopy.initial.mJ, state.derived.spectroscopy.initial.f);
+            ImGui::Text("末态 j/m_j/F = %.1f / %.1f / %.1f", state.derived.spectroscopy.final.j, state.derived.spectroscopy.final.mJ, state.derived.spectroscopy.final.f);
+            ImGui::TextWrapped("项符号: %s -> %s",
+                               state.derived.spectroscopy.initialTermSymbol.c_str(),
+                               state.derived.spectroscopy.finalTermSymbol.c_str());
             ImGui::TextWrapped("第三层说明: %s", state.derived.spectroscopy.notes.c_str());
         } else {
             ImGui::TextWrapped("第三层当前未启用。可在控制面板中开启精细结构、Zeeman 或 Stark 教学修正。");
@@ -2343,6 +2498,63 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
             errors.push_back(sample.errorEv);
         }
         drawPolylinePlot("求解收敛曲线（步长 pm）", grids, errors, convergenceSelectionIndex_, IM_COL32(255, 153, 102, 230), 220.0f, "步长 (pm)", "误差 (eV)");
+
+        std::vector<double> scfIterations;
+        std::vector<double> scfResiduals;
+        scfIterations.reserve(state.derived.meanField.residualHistory.size());
+        scfResiduals.reserve(state.derived.meanField.residualHistory.size());
+        for (std::size_t index = 0; index < state.derived.meanField.residualHistory.size(); ++index) {
+            scfIterations.push_back(static_cast<double>(index + 1));
+            scfResiduals.push_back(state.derived.meanField.residualHistory[index]);
+        }
+        if (scfIterations.size() >= 2) {
+            drawPolylinePlot("SCF 残差",
+                             scfIterations,
+                             scfResiduals,
+                             convergenceSelectionIndex_,
+                             IM_COL32(126, 216, 255, 230),
+                             220.0f,
+                             "迭代",
+                             "残差");
+        }
+
+        std::vector<double> ciIndex;
+        std::vector<double> ciWeights;
+        ciIndex.reserve(state.derived.correlation.components.size());
+        ciWeights.reserve(state.derived.correlation.components.size());
+        for (std::size_t index = 0; index < state.derived.correlation.components.size(); ++index) {
+            ciIndex.push_back(static_cast<double>(index + 1));
+            ciWeights.push_back(state.derived.correlation.components[index].weight);
+        }
+        if (ciIndex.size() >= 2) {
+            drawPolylinePlot("CI 权重",
+                             ciIndex,
+                             ciWeights,
+                             convergenceSelectionIndex_,
+                             IM_COL32(190, 235, 120, 230),
+                             180.0f,
+                             "组态",
+                             "权重");
+        }
+
+        std::vector<double> tdTimes;
+        std::vector<double> tdUpper;
+        tdTimes.reserve(state.derived.timeDynamics.sampleTimes.size());
+        tdUpper.reserve(state.derived.timeDynamics.upperPopulation.size());
+        for (std::size_t index = 0; index < state.derived.timeDynamics.sampleTimes.size(); ++index) {
+            tdTimes.push_back(state.derived.timeDynamics.sampleTimes[index] * 1.0e15);
+            tdUpper.push_back(state.derived.timeDynamics.upperPopulation[index]);
+        }
+        if (tdTimes.size() >= 2) {
+            drawPolylinePlot("TD 布居",
+                             tdTimes,
+                             tdUpper,
+                             convergenceSelectionIndex_,
+                             IM_COL32(255, 190, 92, 230),
+                             220.0f,
+                             "时间 (fs)",
+                             "上能级布居");
+        }
 
         std::vector<double> isotopeMassNumbers;
         std::vector<double> bindingPerNucleon;
@@ -2427,11 +2639,17 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
         const PlotViewState& radialView = plotViewState("径向分布");
         const PlotViewState& centralFieldView = plotViewState("中心场势 V(r)");
         const PlotViewState& convergenceView = plotViewState("求解收敛曲线（步长 pm）");
+        const PlotViewState& meanFieldView = plotViewState("SCF 残差");
+        const PlotViewState& correlationView = plotViewState("CI 权重");
+        const PlotViewState& dynamicsView = plotViewState("TD 布居");
         syncReportingPlotWindow(state.reporting.energyPlotWindow, energyView);
         syncReportingPlotWindow(state.reporting.spectrumPlotWindow, spectrumView);
         syncReportingPlotWindow(state.reporting.radialPlotWindow, radialView);
         syncReportingPlotWindow(state.reporting.centralFieldPlotWindow, centralFieldView);
         syncReportingPlotWindow(state.reporting.convergencePlotWindow, convergenceView);
+        syncReportingPlotWindow(state.reporting.meanFieldPlotWindow, meanFieldView);
+        syncReportingPlotWindow(state.reporting.correlationPlotWindow, correlationView);
+        syncReportingPlotWindow(state.reporting.dynamicsPlotWindow, dynamicsView);
 
         char csvPathBuffer[260];
         std::snprintf(csvPathBuffer, sizeof(csvPathBuffer), "%s", state.reporting.csvOutputPath.c_str());
@@ -2471,6 +2689,21 @@ UiFrameResult AppUi::draw(quantum::app::SimulationState& state,
             ImGui::Text("选中收敛点: 步长=%.6f pm, 误差=%.6e eV",
                         grids[static_cast<std::size_t>(convergenceSelectionIndex_)],
                         errors[static_cast<std::size_t>(convergenceSelectionIndex_)]);
+        }
+        if (!state.derived.meanField.residualHistory.empty()) {
+            ImGui::Text("SCF 末次残差: %.6e", state.derived.meanField.residualHistory.back());
+        }
+        if (state.derived.correlation.solved) {
+            ImGui::Text("CI 权重归一: %.6f",
+                        state.derived.correlation.components.empty()
+                            ? 0.0
+                            : state.derived.correlation.components.front().weight +
+                                  state.derived.correlation.components.back().weight);
+        }
+        if (state.derived.timeDynamics.solved && !state.derived.timeDynamics.upperPopulation.empty()) {
+            ImGui::Text("TD 末端: t=%.6f fs, 上能级=%.6f",
+                        state.derived.timeDynamics.sampleTimes.back() * 1.0e15,
+                        state.derived.timeDynamics.upperPopulation.back());
         }
         if (centralFieldSelectionIndex_ >= 0 &&
             static_cast<std::size_t>(centralFieldSelectionIndex_) < state.derived.centralField.samples.size()) {

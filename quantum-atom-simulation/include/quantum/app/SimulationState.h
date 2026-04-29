@@ -6,7 +6,11 @@
 #include "quantum/physics/CentralField.h"
 #include "quantum/physics/CloudGenerator.h"
 #include "quantum/physics/NumericalSolver.h"
+#include "quantum/solvers/TeachingCorrelationSolver.h"
+#include "quantum/solvers/TeachingMeanFieldSolver.h"
 #include "quantum/spectroscopy/HydrogenicCorrections.h"
+#include "quantum/spectroscopy/SpectralEngine.h"
+#include "quantum/dynamics/DynamicsEngine.h"
 
 #include <string>
 #include <utility>
@@ -96,6 +100,29 @@ struct SolverSettings {
     double screeningLengthBohr = 1.5;
 };
 
+struct MeanFieldSettings {
+    bool enabled = true;
+    quantum::solvers::MeanFieldMode mode = quantum::solvers::MeanFieldMode::HartreeScreened;
+    int maxIterations = 40;
+    double convergenceTolerance = 1.0e-6;
+};
+
+struct CorrelationSettings {
+    bool enabled = true;
+    double couplingStrengthEv = 0.35;
+};
+
+struct DynamicsSettings {
+    bool enabled = false;
+    bool syncCloudPhase = false;
+    double totalTimeSeconds = 2.0e-14;
+    double timeStepSeconds = 1.0e-16;
+    double couplingEv = 0.18;
+    double detuningEv = 0.0;
+    bool includeDissipation = false;
+    double dampingRatePerSecond = 2.0e13;
+};
+
 struct ViewSettings {
     CloudRenderMode cloudRenderMode = CloudRenderMode::Hybrid;
     bool showOrbitRings = true;
@@ -152,6 +179,9 @@ struct ReportingSettings {
     PlotWindowRange radialPlotWindow;
     PlotWindowRange centralFieldPlotWindow;
     PlotWindowRange convergencePlotWindow;
+    PlotWindowRange meanFieldPlotWindow;
+    PlotWindowRange correlationPlotWindow;
+    PlotWindowRange dynamicsPlotWindow;
 };
 
 struct AutoDemoSettings {
@@ -194,6 +224,10 @@ struct DerivedData {
     quantum::physics::CloudData cloud;
     quantum::physics::CentralFieldProfile centralField;
     quantum::physics::NumericalSolverResult solver;
+    quantum::solvers::MeanFieldSolveResult meanField;
+    quantum::solvers::CorrelationSolveResult correlation;
+    quantum::dynamics::DynamicsResult timeDynamics;
+    quantum::spectroscopy::SpectralResult spectralRecords;
     quantum::dynamics::NuclearStructureResult nuclearStructure;
     quantum::dynamics::NuclearCrossSectionResult nuclearCrossSection;
     quantum::dynamics::NuclearTransportResult nuclearTransport;
@@ -219,6 +253,9 @@ struct SimulationState {
     BohrSettings bohr;
     CloudSettings cloud;
     SolverSettings solver;
+    MeanFieldSettings meanField;
+    CorrelationSettings correlation;
+    DynamicsSettings dynamics;
     quantum::spectroscopy::SpectroscopySettings spectroscopy;
     ViewSettings view;
     NuclearAnimationSettings nuclearAnimation;

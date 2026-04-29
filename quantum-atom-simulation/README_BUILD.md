@@ -110,6 +110,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1 -Configuration
 程序默认使用以下资源：
 
 - `assets/data/elements.json`
+- `assets/data/reference_catalog.json`
+- `assets/data/isotopes.json`
 - `assets/data/nist_reference_lines.csv`
 - `assets/scenarios/demo_scenes.json`
 - `assets/scenarios/demo_script.json`

@@ -5,12 +5,16 @@
 #include "quantum/core/Paths.h"
 #include "quantum/core/PerformanceTracker.h"
 #include "quantum/dynamics/NuclearPhysics.h"
+#include "quantum/dynamics/DynamicsEngine.h"
 #include "quantum/meta/MethodMetadata.h"
 #include "quantum/physics/CloudGenerator.h"
 #include "quantum/physics/ElementDatabase.h"
 #include "quantum/physics/NumericalSolver.h"
+#include "quantum/solvers/TeachingCorrelationSolver.h"
+#include "quantum/solvers/TeachingMeanFieldSolver.h"
 #include "quantum/render/Camera.h"
 #include "quantum/render/SceneRenderer.h"
+#include "quantum/spectroscopy/HydrogenicSpectralEngine.h"
 #include "quantum/ui/AppUi.h"
 #include "quantum/validation/ValidationReportWriter.h"
 
@@ -122,8 +126,12 @@ private:
     quantum::core::PerformanceTracker performance_;
     quantum::physics::ElementDatabase elementDatabase_;
     quantum::dynamics::NuclearPhysicsEngine nuclearPhysics_;
+    quantum::dynamics::TeachingDynamicsEngine dynamicsEngine_;
     quantum::physics::ProbabilityCloudGenerator cloudGenerator_;
     quantum::physics::SchrodingerNumericalSolver numericalSolver_;
+    quantum::solvers::TeachingMeanFieldSolver meanFieldSolver_;
+    quantum::solvers::TeachingCorrelationSolver correlationSolver_;
+    quantum::spectroscopy::HydrogenicSpectralEngine spectralEngine_;
     quantum::render::OrbitCamera camera_;
     quantum::render::SceneRenderer sceneRenderer_;
     quantum::ui::AppUi appUi_;

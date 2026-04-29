@@ -13,7 +13,9 @@ public:
 
     [[nodiscard]] virtual std::vector<ElementRecord> elements() const = 0;
     [[nodiscard]] virtual std::optional<ElementRecord> elementByAtomicNumber(int atomicNumber) const = 0;
+    [[nodiscard]] virtual std::vector<IsotopeRecord> isotopesForAtomicNumber(int atomicNumber) const = 0;
     [[nodiscard]] virtual std::vector<TransitionRecord> referenceTransitions(int atomicNumber) const = 0;
+    [[nodiscard]] virtual std::vector<TransitionRecord> referenceTransitions(int atomicNumber, int chargeState) const = 0;
 };
 
 } // namespace quantum::data

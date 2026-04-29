@@ -14,6 +14,11 @@ The `quantum_atom_tests` target validates:
 - analytical `1s`/`2s` orthogonality
 - numerical hydrogen `1s` finite-difference solve
 - convergence samples for grid refinement
+- offline JSON reference catalog and isotope catalog loading
+- Tier 2 teaching mean-field convergence and method labels
+- Tier 4 two-configuration correlation lowering and weight normalization
+- Tier 5 two-level TDSE population conservation and damping sanity
+- Tier 3 hyperfine term-symbol and shift checks
 
 ## Current Reference Cases
 
@@ -54,6 +59,6 @@ This closes the earlier gap where the numerical path depended on an analytical f
 
 ## Reference-Data Scope
 
-Current spectrum comparison in the application uses a local example CSV file under `assets/data/`.
+Current spectrum comparison in the application prefers `assets/data/reference_catalog.json` and falls back to the legacy CSV file under `assets/data/`.
 
 This is useful for UI-side spot checks and demonstration, but it is not a full NIST ASD mirror or complete external-database integration.

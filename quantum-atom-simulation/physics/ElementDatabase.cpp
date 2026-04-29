@@ -41,6 +41,10 @@ bool ElementDatabase::loadReferenceTransitions(const std::filesystem::path& path
     return provider_.loadReferenceTransitions(path);
 }
 
+bool ElementDatabase::loadIsotopes(const std::filesystem::path& path) {
+    return provider_.loadIsotopes(path);
+}
+
 void ElementDatabase::loadBuiltInSubset() {
     provider_.loadBuiltInSubset();
     elements_.clear();
@@ -75,6 +79,15 @@ const quantum::data::ElementRecord* ElementDatabase::elementMetadataByAtomicNumb
 
 std::vector<quantum::data::TransitionRecord> ElementDatabase::referenceTransitions(int atomicNumber) const {
     return provider_.referenceTransitions(atomicNumber);
+}
+
+std::vector<quantum::data::IsotopeRecord> ElementDatabase::isotopesForAtomicNumber(int atomicNumber) const {
+    return provider_.isotopesForAtomicNumber(atomicNumber);
+}
+
+std::vector<quantum::data::TransitionRecord> ElementDatabase::referenceTransitions(int atomicNumber,
+                                                                                   int chargeState) const {
+    return provider_.referenceTransitions(atomicNumber, chargeState);
 }
 
 void ElementDatabase::rebuildIndex() {

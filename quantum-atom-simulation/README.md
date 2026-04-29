@@ -20,18 +20,22 @@
 - 低保真核物理模型：半经验核结构、D-T 截面估计、U-235 热中子裂变截面估计、平板束流衰减、单道衰变率方程
 - 数值求解：径向有限差分本征值法
 - Tier 1 中心场：可切换氢样库仑势或现象学屏蔽中心势
-- Tier 3 谱学修正：氢样精细结构、Zeeman、一阶受限 Stark 教学修正
+- Tier 2 教学平均场：屏蔽 Hartree 风格 SCF、Slater 交换修正、标量相对论预览
+- Tier 3 谱学修正：氢样精细结构、Zeeman、一阶受限 Stark、超精细教学修正和结构化谱线记录
+- Tier 4 教学关联：有限基双组态 CI mixing 原型
+- Tier 5 有限基动力学：二能级 TDSE / Rabi 布居转移教学求解
+- 离线数据目录：本地参考谱线 JSON catalog、同位素教学锚点、CSV 兼容回退
 - 自动验证：解析值、收敛、局部参考光谱、构建与启动 smoke test
 - 交付链路：脚本化构建、运行、验证、打包到 `dist/`
 
 ## 当前明确不支持
 
-- Hartree / Hartree-Fock / Dirac-Fock 自洽平均场
+- 研究级 Hartree-Fock / Dirac-Fock 自洽平均场
 - DFT / CI / MCSCF / CASSCF 等多电子相关方法
 - 严格多电子反对称多体波函数与电子关联
 - 完整 fine / hyperfine / Lamb shift / QED 修正
 - 完整 Zeeman / Stark 高阶谱学求解
-- 真实 TDSE / TD-CI 外场驱动动力学
+- 真实多体 TDSE / TD-CI 外场驱动动力学
 - 全量 NIST ASD 在线联动数据库
 
 ## 元数据覆盖与物理覆盖
@@ -50,13 +54,13 @@
   - 径向单电子中心势、屏蔽中心场、有限差分本征值法
   - 适合做氢样到改进单电子近似的过渡
 - Tier 2：自洽平均场层
-  - 仅预留接口，未实现 HF/Dirac-Fock
+  - 已提供教学级屏蔽 SCF 原型；未实现研究级 HF/Dirac-Fock
 - Tier 3：谱学修正层
   - 当前提供氢样精细结构、Zeeman、受限 Stark 教学修正
 - Tier 4：多电子关联层
-  - 仅预留接口，未实现 CI / MCSCF
+  - 已提供有限基双组态 CI 教学原型；未实现完整 CI / MCSCF
 - Tier 5：真实动力学层
-  - 仅预留接口，当前动画不是 TDSE
+  - 已提供二能级 TDSE/Rabi 教学求解；当前场景动画仍不等于真实多体 TDSE
 
 ## 目录结构
 
@@ -106,6 +110,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -Configuration Re
 ## 运行时资源
 
 - `assets/data/elements.json`
+- `assets/data/reference_catalog.json`
+- `assets/data/isotopes.json`
 - `assets/data/nist_reference_lines.csv`
 - `assets/scenarios/demo_scenes.json`
 - `assets/scenarios/demo_script.json`

@@ -26,6 +26,15 @@ quantum::meta::SourceRecord defaultReferenceSource(const std::filesystem::path& 
             path.generic_string()};
 }
 
+quantum::meta::SourceRecord defaultIsotopeSource(const std::filesystem::path& path) {
+    return {"isotope-catalog-json",
+            "Local isotope teaching catalog",
+            "local-asset",
+            "1",
+            "",
+            path.generic_string()};
+}
+
 quantum::meta::MethodStamp elementImportMethod() {
     quantum::meta::MethodStamp stamp;
     stamp.methodName = "Static element metadata import";
@@ -47,6 +56,18 @@ quantum::meta::MethodStamp referenceImportMethod() {
     stamp.tier = quantum::meta::ModelTier::Tier0Teaching;
     stamp.animationKind = quantum::meta::AnimationKind::None;
     stamp.caveats.push_back("This is not a live NIST ASD integration.");
+    return stamp;
+}
+
+quantum::meta::MethodStamp isotopeImportMethod() {
+    quantum::meta::MethodStamp stamp;
+    stamp.methodName = "Static isotope metadata import";
+    stamp.approximation = "offline isotope teaching catalog";
+    stamp.dataSource = "JSON asset";
+    stamp.validationSummary = "Curated local isotope metadata for teaching anchors.";
+    stamp.tier = quantum::meta::ModelTier::Tier0Teaching;
+    stamp.animationKind = quantum::meta::AnimationKind::None;
+    stamp.caveats.push_back("This is a small teaching catalog, not a complete evaluated isotope database.");
     return stamp;
 }
 
@@ -98,6 +119,81 @@ std::string transitionRecordId(int atomicNumber,
            std::to_string(ni) + "-" + std::to_string(li) + "-" + std::to_string(nf) + "-" + std::to_string(lf);
 }
 
+TransitionRecord parseReferenceCatalogItem(const nlohmann::json& item,
+                                           const quantum::meta::SourceRecord& source,
+                                           const quantum::meta::MethodStamp& method) {
+    const int atomicNumber = item.at("atomic_number").get<int>();
+    const int chargeState = item.value("charge_state", 0);
+    const auto upper = item.at("upper");
+    const auto lower = item.at("lower");
+    const int ni = upper.at("n").get<int>();
+    const int li = upper.at("l").get<int>();
+    const int mi = upper.value("m", 0);
+    const int nf = lower.at("n").get<int>();
+    const int lf = lower.at("l").get<int>();
+    const int mf = lower.value("m", 0);
+    const std::string id = item.value("id", transitionRecordId(atomicNumber, chargeState, ni, li, nf, lf));
+
+    TransitionRecord record;
+    record.label = item.value("label", item.value("series", std::string{"reference"}) + " " +
+                                           std::to_string(ni) + "->" + std::to_string(nf));
+    record.upper.atomicNumber = atomicNumber;
+    record.upper.chargeState = chargeState;
+    record.upper.label = record.label + " upper";
+    record.upper.n = ni;
+    record.upper.l = li;
+    record.upper.m = mi;
+    record.upper.method = method;
+    record.upper.validation = {quantum::meta::ValidationStatus::ReferenceMatched,
+                               record.label + " upper import",
+                               source.title,
+                               "",
+                               0.0,
+                               0.0,
+                               0.0,
+                               0.0,
+                               "Imported local reference state.",
+                               source};
+    record.upper.provenance = {id + "-upper", source.id, "data::JsonDataProvider", "Imported from local reference catalog."};
+    record.lower.atomicNumber = atomicNumber;
+    record.lower.chargeState = chargeState;
+    record.lower.label = record.label + " lower";
+    record.lower.n = nf;
+    record.lower.l = lf;
+    record.lower.m = mf;
+    record.lower.method = method;
+    record.lower.validation = {quantum::meta::ValidationStatus::ReferenceMatched,
+                               record.label + " lower import",
+                               source.title,
+                               "",
+                               0.0,
+                               0.0,
+                               0.0,
+                               0.0,
+                               "Imported local reference state.",
+                               source};
+    record.lower.provenance = {id + "-lower", source.id, "data::JsonDataProvider", "Imported from local reference catalog."};
+    record.wavelengthNm = item.at("wavelength_nm").get<double>();
+    record.photonEnergyEv = item.value("energy_ev", 1239.8419843320026 / record.wavelengthNm);
+    record.frequencyHz = (record.wavelengthNm > 0.0)
+                             ? (299792458.0 / (record.wavelengthNm * 1.0e-9))
+                             : 0.0;
+    record.allowed = item.value("allowed", true);
+    record.method = method;
+    record.validation = {quantum::meta::ValidationStatus::ReferenceMatched,
+                         record.label,
+                         source.title,
+                         "nm",
+                         record.wavelengthNm,
+                         record.wavelengthNm,
+                         0.0,
+                         0.0,
+                         item.value("notes", std::string{"Imported local reference line."}),
+                         source};
+    record.provenance = {id, source.id, "data::JsonDataProvider", "Imported from local reference catalog."};
+    return record;
+}
+
 } // namespace
 
 bool JsonDataProvider::loadElements(const std::filesystem::path& path) {
@@ -138,6 +234,17 @@ bool JsonDataProvider::loadReferenceTransitions(const std::filesystem::path& pat
     const auto method = referenceImportMethod();
 
     referenceTransitions_.clear();
+    if (path.extension() == ".json") {
+        const auto json = nlohmann::json::parse(stream, nullptr, true, true);
+        const auto catalogSource =
+            parseSourceRecord(json.value("source", nlohmann::json::object()), defaultReferenceSource(path));
+        const auto catalogMethod = referenceImportMethod();
+        for (const auto& item : json.at("transitions")) {
+            referenceTransitions_.push_back(parseReferenceCatalogItem(item, catalogSource, catalogMethod));
+        }
+        return !referenceTransitions_.empty();
+    }
+
     std::string line;
     std::getline(stream, line);
     while (std::getline(stream, line)) {
@@ -219,6 +326,30 @@ bool JsonDataProvider::loadReferenceTransitions(const std::filesystem::path& pat
     return !referenceTransitions_.empty();
 }
 
+bool JsonDataProvider::loadIsotopes(const std::filesystem::path& path) {
+    std::ifstream stream(path);
+    if (!stream.is_open()) {
+        return false;
+    }
+
+    const auto json = nlohmann::json::parse(stream, nullptr, true, true);
+    const auto source = parseSourceRecord(json.value("source", nlohmann::json::object()), defaultIsotopeSource(path));
+    const auto method = isotopeImportMethod();
+
+    isotopes_.clear();
+    for (const auto& item : json.at("isotopes")) {
+        IsotopeRecord record;
+        record.atomicNumber = item.at("atomic_number").get<int>();
+        record.massNumber = item.at("mass_number").get<int>();
+        record.atomicMassU = item.value("atomic_mass_u", 0.0);
+        record.naturalAbundance = item.value("natural_abundance", 0.0);
+        record.source = source;
+        (void)method;
+        isotopes_.push_back(std::move(record));
+    }
+    return !isotopes_.empty();
+}
+
 void JsonDataProvider::loadBuiltInSubset() {
     const auto source = quantum::meta::SourceRecord{"elements-builtin",
                                                     "Built-in light-element subset",
@@ -261,10 +392,30 @@ std::optional<ElementRecord> JsonDataProvider::elementByAtomicNumber(int atomicN
     return elements_.at(it->second);
 }
 
+std::vector<IsotopeRecord> JsonDataProvider::isotopesForAtomicNumber(int atomicNumber) const {
+    std::vector<IsotopeRecord> result;
+    for (const auto& isotope : isotopes_) {
+        if (isotope.atomicNumber == atomicNumber) {
+            result.push_back(isotope);
+        }
+    }
+    return result;
+}
+
 std::vector<TransitionRecord> JsonDataProvider::referenceTransitions(int atomicNumber) const {
     std::vector<TransitionRecord> result;
     for (const auto& record : referenceTransitions_) {
         if (record.upper.atomicNumber == atomicNumber) {
+            result.push_back(record);
+        }
+    }
+    return result;
+}
+
+std::vector<TransitionRecord> JsonDataProvider::referenceTransitions(int atomicNumber, int chargeState) const {
+    std::vector<TransitionRecord> result;
+    for (const auto& record : referenceTransitions_) {
+        if (record.upper.atomicNumber == atomicNumber && record.upper.chargeState == chargeState) {
             result.push_back(record);
         }
     }

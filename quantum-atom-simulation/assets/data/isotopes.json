@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "coverage_note": "Small offline isotope catalog for teaching anchors and validation examples.",
+  "source": {
+    "id": "isotope-catalog-json",
+    "title": "Offline isotope teaching catalog",
+    "provider": "local-asset",
+    "revision": "1",
+    "license": "",
+    "url": "assets/data/isotopes.json"
+  },
+  "isotopes": [
+    { "atomic_number": 1, "mass_number": 1, "atomic_mass_u": 1.00782503223, "natural_abundance": 0.999885 },
+    { "atomic_number": 1, "mass_number": 2, "atomic_mass_u": 2.01410177812, "natural_abundance": 0.000115 },
+    { "atomic_number": 1, "mass_number": 3, "atomic_mass_u": 3.01604928199, "natural_abundance": 0.0 },
+    { "atomic_number": 2, "mass_number": 3, "atomic_mass_u": 3.0160293201, "natural_abundance": 0.00000134 },
+    { "atomic_number": 2, "mass_number": 4, "atomic_mass_u": 4.00260325413, "natural_abundance": 0.99999866 },
+    { "atomic_number": 6, "mass_number": 12, "atomic_mass_u": 12.0, "natural_abundance": 0.9893 },
+    { "atomic_number": 6, "mass_number": 13, "atomic_mass_u": 13.00335483507, "natural_abundance": 0.0107 },
+    { "atomic_number": 26, "mass_number": 56, "atomic_mass_u": 55.93493633, "natural_abundance": 0.91754 },
+    { "atomic_number": 92, "mass_number": 235, "atomic_mass_u": 235.0439299, "natural_abundance": 0.007204 },
+    { "atomic_number": 92, "mass_number": 238, "atomic_mass_u": 238.05078826, "natural_abundance": 0.992742 }
+  ]
+}

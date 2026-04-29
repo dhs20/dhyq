@@ -5,6 +5,9 @@
 - `H`：严格氢样解析与谱线演示
 - `He+`：氢样 `Z^2` 缩放与约化质量演示
 - `Ne Approx`：`Z_eff + Slater` 多电子教学近似演示
+- `He/Ne SCF`：教学平均场和有限基关联演示
+- `H Hyperfine/Rabi`：超精细修正与二能级 TDSE / Rabi 动力学演示
+- `Fe/U Nuclear`：同位素锚点、核结构与低保真核过程演示
 
 这些场景由：
 

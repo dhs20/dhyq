@@ -100,3 +100,24 @@ Implemented workflow:
 - report convergence samples as `grid step -> energy error`
 
 This path is fully numerical for the hydrogenic validation mode.
+
+## Teaching Mean Field, Correlation, And Dynamics
+
+Tier 2 now includes a compact teaching mean-field prototype:
+
+- screened Hartree-style effective-charge iteration
+- optional Slater exchange energy correction
+- optional scalar-relativistic preview correction
+- residual history and method/validation metadata
+
+Tier 4 includes a two-configuration mixing prototype:
+
+- builds a 2x2 teaching Hamiltonian from mean-field reference energy and a configurable coupling
+- reports correlated energy, correlation energy, and normalized configuration weights
+- demonstrates the correlation interface without claiming full CI / MCSCF fidelity
+
+Tier 5 includes a finite-basis two-level TDSE/Rabi solver:
+
+- propagates lower/upper populations and a dipole-like observable
+- supports coupling, detuning, and a simple damping envelope
+- is the only current time-dependent quantum solver path; scene animations remain illustrative unless driven by this finite-basis result

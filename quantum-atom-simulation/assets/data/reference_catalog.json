@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "coverage_note": "Small offline teaching catalog for local spectrum comparisons. It is not a full NIST ASD mirror.",
+  "source": {
+    "id": "reference-catalog-json",
+    "title": "Offline teaching reference spectral catalog",
+    "provider": "local-asset",
+    "revision": "1",
+    "license": "",
+    "url": "assets/data/reference_catalog.json"
+  },
+  "transitions": [
+    {
+      "id": "h-lyman-alpha",
+      "label": "H Lyman alpha",
+      "series": "Lyman",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "upper": { "n": 2, "l": 1, "m": 0 },
+      "lower": { "n": 1, "l": 0, "m": 0 },
+      "wavelength_nm": 121.567,
+      "energy_ev": 10.199,
+      "allowed": true,
+      "notes": "Hydrogen teaching anchor."
+    },
+    {
+      "id": "h-balmer-alpha",
+      "label": "H Balmer alpha",
+      "series": "Balmer",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "upper": { "n": 3, "l": 1, "m": 0 },
+      "lower": { "n": 2, "l": 0, "m": 0 },
+      "wavelength_nm": 656.279,
+      "energy_ev": 1.889,
+      "allowed": true,
+      "notes": "Hydrogen teaching anchor."
+    },
+    {
+      "id": "h-paschen-alpha",
+      "label": "H Paschen alpha",
+      "series": "Paschen",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "upper": { "n": 4, "l": 1, "m": 0 },
+      "lower": { "n": 3, "l": 0, "m": 0 },
+      "wavelength_nm": 1875.1,
+      "energy_ev": 0.661,
+      "allowed": true,
+      "notes": "Hydrogen teaching anchor."
+    },
+    {
+      "id": "heplus-lyman-alpha",
+      "label": "He+ Lyman alpha",
+      "series": "He+ Lyman",
+      "atomic_number": 2,
+      "charge_state": 1,
+      "upper": { "n": 2, "l": 1, "m": 0 },
+      "lower": { "n": 1, "l": 0, "m": 0 },
+      "wavelength_nm": 30.378,
+      "energy_ev": 40.798,
+      "allowed": true,
+      "notes": "Hydrogen-like helium ion teaching anchor."
+    },
+    {
+      "id": "heplus-balmer-alpha",
+      "label": "He+ Balmer alpha",
+      "series": "He+ Balmer",
+      "atomic_number": 2,
+      "charge_state": 1,
+      "upper": { "n": 4, "l": 1, "m": 0 },
+      "lower": { "n": 2, "l": 0, "m": 0 },
+      "wavelength_nm": 121.512,
+      "energy_ev": 10.204,
+      "allowed": true,
+      "notes": "Hydrogen-like helium ion teaching anchor."
+    },
+    {
+      "id": "li2plus-lyman-alpha",
+      "label": "Li2+ Lyman alpha",
+      "series": "Li2+ Lyman",
+      "atomic_number": 3,
+      "charge_state": 2,
+      "upper": { "n": 2, "l": 1, "m": 0 },
+      "lower": { "n": 1, "l": 0, "m": 0 },
+      "wavelength_nm": 13.502,
+      "energy_ev": 91.791,
+      "allowed": true,
+      "notes": "Hydrogen-like lithium ion teaching anchor."
+    },
+    {
+      "id": "li2plus-balmer-alpha",
+      "label": "Li2+ Balmer alpha",
+      "series": "Li2+ Balmer",
+      "atomic_number": 3,
+      "charge_state": 2,
+      "upper": { "n": 3, "l": 1, "m": 0 },
+      "lower": { "n": 2, "l": 0, "m": 0 },
+      "wavelength_nm": 72.920,
+      "energy_ev": 17.003,
+      "allowed": true,
+      "notes": "Hydrogen-like lithium ion teaching anchor."
+    }
+  ]
+}
