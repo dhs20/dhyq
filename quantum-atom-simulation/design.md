@@ -4,11 +4,11 @@
 
 这是一个“教学展示 + 数值验证 + 可扩展架构预留”的多保真度原子结构/光谱/可视化平台。
 
-当前第一目标不是研究级高精度原子结构，而是：
+当前 0.3.1 第一目标不是研究级高精度原子结构，而是：
 
 - clean clone 后可构建
 - Windows x64 可运行
-- 最小演示可完成
+- 健康检查、smoke test、测试、打包验证可完成
 - 科学表述不误导
 - 后续高阶物理模块有清晰落点
 
@@ -25,13 +25,16 @@
 - 谱线、能级、径向分布、收敛曲线
 - 异步概率云构建、预览云优先
 - 自动演示脚本录制与回放
+- 离线参考谱线 JSON catalog、同位素教学目录和 CSV 回退
+- Tier 2 教学平均场、Tier 3 谱学修正、Tier 4 双组态 mixing、Tier 5 二能级动力学原型
 
-### 未实现但必须诚实标注
+### 当前边界
 
 - HF / Dirac-Fock / DFT
-- CI / MCSCF / CASSCF
-- fine structure / hyperfine / Zeeman / Stark
-- 真实 TDSE / TD-CI 动力学
+- 完整 CI / MCSCF / CASSCF
+- 复杂原子的完整 fine / hyperfine / Lamb / QED 谱学求解
+- 高阶 Zeeman / Stark 矩阵对角化
+- 真实多体 TDSE / TD-CI 动力学
 - 完整周期表高精度求解
 
 ## 3. 模块划分
@@ -49,9 +52,9 @@
 - `ui/`
   - Scene / Inspector / Physics / Plots / Performance / Help / Log
 - `tests/`
-  - 物理与数值回归测试
+  - 物理、数据、报告与数值回归测试
 
-### 结构预留模块
+### 已落地或扩展中的模块
 
 - `basis/`
 - `solvers/`
@@ -102,6 +105,7 @@
    - `Z_eff` 与电子组态
    - 径向分布
    - 数值求解结果
+   - 教学平均场 / 关联 / 二能级动力学结果
    - 概率云数据
 4. `render/SceneRenderer` 将缓存结果转为 GPU 资源。
 5. `ui/AppUi` 读取同一批缓存结果进行参数面板、图表和日志展示。
@@ -153,23 +157,23 @@
 
 ### Tier 2：自洽平均场层
 
-- 仅预留接口
-- 目标：Hartree / Hartree-Fock / Dirac-Fock
+- 当前提供教学级屏蔽 SCF、Slater 交换修正、标量相对论预览
+- 不等同于研究级 Hartree-Fock / Dirac-Fock
 
 ### Tier 3：谱学修正层
 
-- 仅预留接口与标签规范
-- 目标：fine、hyperfine、Zeeman、Stark
+- 当前提供氢样 fine、hyperfine、Zeeman、受限 Stark 教学修正
+- 不等同于完整复杂原子谱学程序
 
 ### Tier 4：多电子关联层
 
-- 仅预留接口与路线
-- 目标：CI、MCSCF 风格基组方法
+- 当前提供有限基双组态 CI mixing 教学原型
+- 不等同于完整 CI、MCSCF、CASSCF
 
 ### Tier 5：真实动力学层
 
-- 仅预留接口与表述规则
-- 只有这一层的动画才允许称为真实时间依赖量子动力学
+- 当前提供二能级有限基 TDSE / Rabi 教学求解
+- 只有该求解器输出可称为有限基时间依赖教学结果；其他场景动画仍是演示或叠加态可视化
 
 ## 8. UI 信息架构
 
@@ -202,6 +206,7 @@
 
 - 元素数据库读取失败时回退内置轻元素子集
 - 参考 CSV / 演示脚本失败时输出明确日志
+- 参考 JSON 缺失时回退 CSV 并输出警告
 
 ## 10. 近期升级路线
 
@@ -210,6 +215,7 @@
 - 保持 `xmake` 构建和 Windows x64 可执行交付
 - 继续补方法标签和验证元数据落地
 - 扩展元素数据和参考数据库映射
+- 保持 `docs/reports/` 生产就绪证据与 release 验证同步
 
 ### Should
 
@@ -220,5 +226,5 @@
 ### Could
 
 - Tier 1 有效势增强
-- Tier 2 自洽平均场原型
+- Tier 2 教学平均场数值稳定性增强
 - Tier 3 谱学修正插件化

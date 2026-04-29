@@ -2,7 +2,7 @@
 
 ## 项目真实定位
 
-这个项目当前是一个“多保真度原子结构 / 光谱 / 可视化平台”的 MVP。
+这个项目当前是一个 Windows x64 可部署的“多保真度原子结构 / 光谱 / 可视化教学平台”。
 
 当前最可靠的主线仍然是：
 - 氢样原子与氢样离子的解析模型
@@ -14,7 +14,7 @@
 它当前不应被表述为：
 - 研究级高精度原子结构程序
 - 完整核数据库或核反应工程代码
-- 已实现 HF / DFT / CI / MCSCF / TDSE / TDHF 的成熟平台
+- 已实现研究级 HF / DFT / 完整 CI / MCSCF / TDSE / TDHF 的成熟平台
 
 ## 当前原子物理能力
 
@@ -85,12 +85,14 @@
 - `Gamow-like D-T fusion cross-section estimate`
 - `Single-speed slab attenuation model`
 - `Single-channel radioactive decay law`
+- `Teaching finite-basis CI mixing prototype`
+- `Two-level finite-basis TDSE / Rabi teaching solver`
 
 禁止表述：
 - `Research-grade atomic structure`
 - `Research-grade nuclear reaction solver`
 - `Real-time quantum dynamics`
-- `HF / DFT / CI / MCSCF implemented`
+- `Research-grade HF / DFT / CI / MCSCF implemented`
 
 ## 分层状态
 

@@ -600,7 +600,9 @@ bool Application::initialize() {
 
     if (elementDatabase_.loadReferenceTransitions(paths_.asset("data/reference_catalog.json"))) {
         logger_.info("已从 assets/data/reference_catalog.json 加载离线参考谱线目录。");
-    } else if (!elementDatabase_.loadReferenceTransitions(paths_.asset("data/nist_reference_lines.csv"))) {
+    } else if (elementDatabase_.loadReferenceTransitions(paths_.asset("data/nist_reference_lines.csv"))) {
+        logger_.warn("加载 assets/data/reference_catalog.json 失败，已回退到 assets/data/nist_reference_lines.csv。");
+    } else {
         logger_.warn("未能加载本地参考谱线映射，谱线对照将不可用。");
     }
 

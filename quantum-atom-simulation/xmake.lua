@@ -1,7 +1,13 @@
 set_project("quantum-atom-simulation")
-set_version("0.2.0")
+set_version("0.3.1")
 set_languages("cxx20")
 add_rules("mode.debug", "mode.release")
+
+option("local_pkg_root")
+    set_default("")
+    set_showmenu(true)
+    set_description("Optional xmake local package install root for offline/reproducible builds")
+option_end()
 
 if is_plat("windows") then
     add_cxxflags("/utf-8", {force = true})
@@ -14,7 +20,11 @@ add_requires("nlohmann_json v3.11.3")
 add_requires("imgui v1.92.6-docking", {configs = {glfw = true, opengl3 = true}})
 
 local function add_local_cached_package(name, version, links)
-    local pkgroot = path.join(os.projectdir(), "..", ".xmake-pkg-install", name:sub(1, 1), name, version)
+    local local_pkg_root = get_config("local_pkg_root")
+    if not local_pkg_root or local_pkg_root == "" then
+        return
+    end
+    local pkgroot = path.join(local_pkg_root, name:sub(1, 1), name, version)
     for _, dir in ipairs(os.dirs(path.join(pkgroot, "*"))) do
         local includedir = path.join(dir, "include")
         local libdir = path.join(dir, "lib")

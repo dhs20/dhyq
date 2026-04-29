@@ -3,6 +3,7 @@ param(
     [string]$Configuration = "Release",
     [switch]$Clean,
     [switch]$Reconfigure,
+    [string]$LocalPackageRoot,
     [string]$ProjectRoot
 )
 
@@ -54,6 +55,14 @@ Write-Host "[build] xmake global dir: $env:XMAKE_GLOBALDIR"
 Write-Host "[build] xmake package cache: $env:XMAKE_PKG_CACHEDIR"
 Write-Host "[build] xmake package install: $env:XMAKE_PKG_INSTALLDIR"
 
+if (-not $LocalPackageRoot -and $env:XMAKE_PKG_INSTALLDIR -and (Test-Path $env:XMAKE_PKG_INSTALLDIR)) {
+    $LocalPackageRoot = $env:XMAKE_PKG_INSTALLDIR
+}
+if ($LocalPackageRoot) {
+    $LocalPackageRoot = (Resolve-Path $LocalPackageRoot).Path
+    Write-Host "[build] local package root: $LocalPackageRoot"
+}
+
 Push-Location $root
 try {
     if ($Clean) {
@@ -65,7 +74,11 @@ try {
     }
 
     Write-Host "[build] configuring"
-    & xmake f -m $Configuration.ToLowerInvariant() -y
+    $configureArgs = @("f", "-m", $Configuration.ToLowerInvariant(), "-y")
+    if ($LocalPackageRoot) {
+        $configureArgs += "--local_pkg_root=$LocalPackageRoot"
+    }
+    & xmake @configureArgs
     if ($LASTEXITCODE -ne 0) {
         throw "xmake configure failed with exit code $LASTEXITCODE"
     }

@@ -1,17 +1,17 @@
 # Upgrade Status
 
-更新日期：2026-03-27
+更新日期：2026-04-29
 
 ## 当前判断
 
-项目已经从旧版 `freeglut + 立即模式 + 快捷键/HUD` 教学原型，升级为一个在 Windows x64 下可构建、可运行、可验证、可打包的桌面 MVP。
+项目已经从旧版 `freeglut + 立即模式 + 快捷键/HUD` 教学原型，升级为一个在 Windows x64 下可构建、可运行、可验证、可打包、可健康检查的 0.3.1 桌面教学软件。
 
 当前最重要的结论是：
 
-- 工程交付主线已经基本打通
+- 工程交付主线已经打通，并补充了包完整性验证、健康检查和 release 验证脚本
 - 科学表达已经基本做到“不过度包装”
-- 物理能力仍以氢样体系、中心场近似、教学型多电子近似为主
-- 后续高阶理论层已经预留接口，但没有伪装成已实现
+- 物理能力仍以氢样体系、中心场近似、教学型多电子近似和有限基教学原型为主
+- 后续研究级理论层保留清晰边界，没有伪装成已实现
 
 ## 已完成
 
@@ -23,8 +23,13 @@
   - [scripts/run.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/run.ps1)
   - [scripts/build_and_run.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/build_and_run.ps1)
   - [scripts/package.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/package.ps1)
+  - [scripts/verify_package.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/verify_package.ps1)
+  - [scripts/health_check.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/health_check.ps1)
+  - [scripts/coverage_report.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/coverage_report.ps1)
+  - [scripts/validate_release.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/validate_release.ps1)
   - [scripts/smoke_test.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/smoke_test.ps1)
 - 已支持 `dist/` 打包发布目录
+- 已支持 `docs/reports/` 生产就绪证据集
 - 已加入 Windows CI 工作流：
   - [.github/workflows/windows-xmake.yml](/D:/project/dhyq/quantum-atom-simulation/.github/workflows/windows-xmake.yml)
 
@@ -116,7 +121,7 @@
 - 已有 LOD、预览云/全质量云、GPU timer、显存跟踪估算
 - 但还没有真正的 GPU 侧云生成与更高阶的屏幕误差 LOD
 
-## 尚未实现
+## 尚未实现的研究级能力
 
 ### 研究级高阶理论
 
@@ -124,7 +129,7 @@
 - DFT
 - 完整 CI
 - MCSCF / CASSCF
-- 严格多电子反对称多体波函数与电子关联
+- 严格多电子反对称多体波函数与研究级电子关联
 - 真实多体 TDSE / TD-CI / TDHF 外场驱动时间推进
 
 ## 需要持续保持诚实表达的边界

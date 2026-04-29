@@ -2,11 +2,11 @@
 
 面向教学展示、数值验证和后续扩展的多保真度原子结构 / 光谱 / 可视化平台。
 
-当前项目的第一目标是交付一个在 Windows x64 下可构建、可运行、可验证的 MVP，而不是把教学近似包装成研究级原子结构软件。
+当前 0.3.1 版本的第一目标是交付一个在 Windows x64 下可构建、可运行、可验证、可打包的教学/科学可视化桌面程序，而不是把教学近似包装成研究级原子结构软件。
 
 ## 项目定位
 
-- 工程定位：可 clean clone、可构建、可运行、可打包、可继续扩展的桌面科学可视化程序
+- 工程定位：可 clean clone、可构建、可运行、可打包、可健康检查、可继续扩展的桌面科学可视化程序
 - 科学定位：以氢样体系、径向中心势、教学型多电子近似和本地参考光谱对照为主
 - 表达原则：明确区分教学近似、可视化演示、数值求解、真实时间依赖模拟、高精度理论
 
@@ -25,13 +25,13 @@
 - Tier 4 教学关联：有限基双组态 CI mixing 原型
 - Tier 5 有限基动力学：二能级 TDSE / Rabi 布居转移教学求解
 - 离线数据目录：本地参考谱线 JSON catalog、同位素教学锚点、CSV 兼容回退
-- 自动验证：解析值、收敛、局部参考光谱、构建与启动 smoke test
-- 交付链路：脚本化构建、运行、验证、打包到 `dist/`
+- 自动验证：解析值、收敛、局部参考光谱、报告导出、构建、健康检查与启动 smoke test
+- 交付链路：脚本化构建、运行、验证、覆盖率/覆盖矩阵、打包与包完整性检查到 `dist/`
 
 ## 当前明确不支持
 
 - 研究级 Hartree-Fock / Dirac-Fock 自洽平均场
-- DFT / CI / MCSCF / CASSCF 等多电子相关方法
+- DFT / 完整 CI / MCSCF / CASSCF 等研究级多电子相关方法
 - 严格多电子反对称多体波函数与电子关联
 - 完整 fine / hyperfine / Lamb shift / QED 修正
 - 完整 Zeeman / Stark 高阶谱学求解
@@ -56,7 +56,7 @@
 - Tier 2：自洽平均场层
   - 已提供教学级屏蔽 SCF 原型；未实现研究级 HF/Dirac-Fock
 - Tier 3：谱学修正层
-  - 当前提供氢样精细结构、Zeeman、受限 Stark 教学修正
+  - 当前提供氢样精细结构、Zeeman、受限 Stark、hyperfine 教学修正与 term symbol 展示
 - Tier 4：多电子关联层
   - 已提供有限基双组态 CI 教学原型；未实现完整 CI / MCSCF
 - Tier 5：真实动力学层
@@ -90,13 +90,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Configuration Releas
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1 -Configuration Release
+powershell -ExecutionPolicy Bypass -File .\scripts\health_check.ps1 -Configuration Release
 ```
 
 完整验证并打包：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build_and_run.ps1 -Configuration Release -RunTests
-powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -Configuration Release -Build -IncludeTests
+powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -Configuration Release -Build -IncludeTests -Verify
+powershell -ExecutionPolicy Bypass -File .\scripts\validate_release.ps1 -Configuration Release
 ```
 
 ## 输出位置
@@ -106,6 +108,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -Configuration Re
 - 发行包：`dist/windows/x64/<config>/quantum_atom_simulation/`
 - 运行日志：`logs/runtime.log`
 - 验证报告：`docs/reports/latest-validation-report.md` 和同名 `.json`
+- 生产就绪证据：`docs/reports/production-readiness-audit.md` 等交付报告
 
 ## 运行时资源
 

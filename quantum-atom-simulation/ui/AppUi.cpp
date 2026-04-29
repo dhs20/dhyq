@@ -438,6 +438,19 @@ void drawMethodTags(const quantum::app::SimulationState& state) {
     ImGui::SeparatorText("方法标签");
     const bool strictHydrogenic = state.approximationMode == quantum::physics::ApproximationMode::StrictHydrogenic;
     const bool numericalRadial = state.cloud.useNumericalRadial && state.derived.solver.converged;
+    const auto hasCapability = [&state](auto predicate) {
+        return std::any_of(state.derived.methodStamps.begin(),
+                           state.derived.methodStamps.end(),
+                           predicate);
+    };
+    const bool hasCorrelation =
+        hasCapability([](const quantum::meta::MethodStamp& stamp) { return stamp.includesElectronCorrelation; });
+    const bool hasRelativity =
+        hasCapability([](const quantum::meta::MethodStamp& stamp) { return stamp.includesRelativity; });
+    const bool hasExternalField =
+        hasCapability([](const quantum::meta::MethodStamp& stamp) { return stamp.includesExternalField; });
+    const bool hasTimeDependent =
+        hasCapability([](const quantum::meta::MethodStamp& stamp) { return stamp.isTimeDependent; });
 
     std::string method = strictHydrogenic ? "严格氢样解析模型" : "教学近似：Z_eff + Slater";
     if (numericalRadial) {
@@ -448,14 +461,14 @@ void drawMethodTags(const quantum::app::SimulationState& state) {
     ImGui::TextWrapped("近似层级: %s",
                        strictHydrogenic ? "单电子氢样模型"
                                         : "多电子教学近似");
-    ImGui::TextWrapped("电子关联: 未实现");
+    ImGui::TextWrapped("电子关联: %s", hasCorrelation ? "有限基教学 CI mixing 已启用" : "当前激活方法未包含电子关联");
     ImGui::TextWrapped("反对称性: %s",
                        strictHydrogenic ? "单电子体系，不涉及多电子反对称波函数"
-                                        : "未显式处理多电子反对称性");
-    ImGui::TextWrapped("相对论修正: 未实现");
-    ImGui::TextWrapped("外场耦合: 未实现");
-    ImGui::TextWrapped("时间依赖: 否，当前不是真实 TDSE/TD-CI 动力学");
-    ImGui::TextWrapped("数据来源: elements.json + 本地参考谱线 CSV");
+                                        : "通过教学组态/CI 标签表达，非严格多体反对称波函数");
+    ImGui::TextWrapped("相对论修正: %s", hasRelativity ? "教学级精细结构或标量相对论预览已启用" : "当前激活方法未包含相对论项");
+    ImGui::TextWrapped("外场耦合: %s", hasExternalField ? "Zeeman/Stark 或二能级驱动项已启用" : "当前激活方法未包含外场项");
+    ImGui::TextWrapped("时间依赖: %s", hasTimeDependent ? "有限基二能级时间推进已启用" : "当前场景不是时间依赖量子求解");
+    ImGui::TextWrapped("数据来源: elements.json + reference_catalog.json + isotopes.json（CSV 兼容回退）");
     ImGui::TextWrapped("验证状态: %s",
                        strictHydrogenic ? "已做 H/He+ 解析值、跃迁和数值收敛验证"
                                         : "教学近似，仅做一致性与数值链路验证");
@@ -483,14 +496,17 @@ void drawMethodTags(const quantum::app::SimulationState& state) {
 void drawAnimationDisclosure(const quantum::app::SimulationState& state) {
     ImGui::SeparatorText("动画分类");
     ImGui::TextWrapped("当前动画: %s", currentAnimationLabel(state));
-    ImGui::TextWrapped("是否直接求解 TDSE/TD-CI: 否");
-    ImGui::TextWrapped("是否存在外场驱动: 否");
-    ImGui::TextWrapped("是否包含耗散: 否");
+    ImGui::TextWrapped("是否直接求解 TDSE/TD-CI: %s",
+                       state.dynamics.enabled ? "是，二能级有限基 TDSE 教学模型" : "否");
+    ImGui::TextWrapped("是否存在外场驱动: %s",
+                       state.dynamics.enabled ? "是，经典驱动耦合项" : "否");
+    ImGui::TextWrapped("是否包含耗散: %s",
+                       (state.dynamics.enabled && state.dynamics.includeDissipation) ? "是，简化阻尼包络" : "否");
     if (state.nuclearAnimation.enabled) {
         ImGui::TextWrapped("核过程说明: 当前“%s”场景动画仍以教学示意为主；相关面板会给出简化的截面、衰减或衰变模型，但这里的画面本身不是完整核反应输运或微观核动力学求解。",
                            nuclearAnimationModeLabel(state.nuclearAnimation.mode));
     }
-    ImGui::TextWrapped("说明: 当前动画主要用于教学展示、相机过渡、核过程示意和基态/叠加态可视化，不应解释为真实时间依赖量子动力学。");
+    ImGui::TextWrapped("说明: 只有启用二能级 TDSE 时，结果可标注为有限基时间依赖教学求解；其余相机过渡、核过程示意和基态/叠加态可视化不应解释为真实多体时间依赖量子动力学。");
 }
 
 void drawValidationTable(const std::vector<quantum::meta::ValidationRecord>& records) {

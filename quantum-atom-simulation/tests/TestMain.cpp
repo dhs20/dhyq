@@ -1,3 +1,4 @@
+#include "quantum/basis/BasisMetadata.h"
 #include "quantum/dynamics/NuclearPhysics.h"
 #include "quantum/dynamics/DynamicsEngine.h"
 #include "quantum/data/JsonDataProvider.h"
@@ -15,7 +16,9 @@
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
 
 namespace {
@@ -113,6 +116,25 @@ int main() {
     expectTrue("Oganesson Chinese name", !oganesson.localizedNameZh.empty());
     const auto hydrogenIsotopes = database.isotopesForAtomicNumber(1);
     expectTrue("Isotope teaching catalog", hydrogenIsotopes.size() >= 3);
+
+    const auto basisOrder = quantum::basis::aufbauOrder(4);
+    expectTrue("Basis metadata order populated", basisOrder.size() >= 8);
+    expectTrue("Basis metadata first orbital", !basisOrder.empty() && basisOrder.front().label == "1s");
+    expectTrue("Basis metadata 3d capacity", quantum::basis::subshellCapacity(2) == 10);
+    expectTrue("Basis metadata angular label", quantum::basis::angularMomentumLabel(3) == "f");
+
+    ElementDatabase fallbackDatabase;
+    const auto missingJson = projectRoot / "assets" / "data" / "missing_reference_catalog_for_test.json";
+    expectTrue("Missing reference catalog returns false", !fallbackDatabase.loadReferenceTransitions(missingJson));
+    expectTrue("CSV reference fallback loads", fallbackDatabase.loadReferenceTransitions(referencesPath));
+    expectTrue("CSV fallback provenance source",
+               !fallbackDatabase.referenceTransitions(1).empty() &&
+                   fallbackDatabase.referenceTransitions(1).front().provenance.sourceId == "reference-lines-csv");
+
+    ElementDatabase builtInFallback;
+    expectTrue("Missing elements JSON returns false", !builtInFallback.loadFromJson(projectRoot / "assets" / "data" / "missing_elements_for_test.json"));
+    builtInFallback.loadBuiltInSubset();
+    expectTrue("Built-in element fallback contains hydrogen", builtInFallback.elementByAtomicNumber(1).symbol == "H");
 
     expectNear("Bohr radius", constants::bohrRadiusM, 5.29177210903e-11, 1e-20);
     expectNear("eV->J", units::evToJoule(13.6), 2.17896022224e-18, 1e-21);
@@ -420,6 +442,10 @@ int main() {
     reportInput.outputStem = "test-validation-report";
     reportInput.methods.push_back({"Transition", lymanAlpha.method});
     reportInput.methods.push_back({"Solver", numerical.method});
+    reportInput.methods.push_back({"Mean field", meanField.method});
+    reportInput.methods.push_back({"Spectroscopy", correctedTransition.method});
+    reportInput.methods.push_back({"Correlation", correlation.method});
+    reportInput.methods.push_back({"Dynamics", rabiDynamics.method});
     reportInput.records = lymanAlpha.validation;
     reportInput.records.insert(reportInput.records.end(), numerical.validation.begin(), numerical.validation.end());
     const auto reportPath =
@@ -427,6 +453,14 @@ int main() {
     const auto reportResult = reportWriter.write(reportInput, reportPath);
     expectTrue("Validation report markdown export", reportResult.ok && std::filesystem::exists(reportResult.markdownPath));
     expectTrue("Validation report json export", reportResult.ok && std::filesystem::exists(reportResult.jsonPath));
+    if (std::filesystem::exists(reportResult.markdownPath)) {
+        std::ifstream reportStream(reportResult.markdownPath);
+        const std::string reportText((std::istreambuf_iterator<char>(reportStream)), std::istreambuf_iterator<char>());
+        expectTrue("Validation report includes Tier 2", reportText.find("Tier 2 Mean Field") != std::string::npos);
+        expectTrue("Validation report includes Tier 3", reportText.find("Tier 3 Spectroscopy Corrections") != std::string::npos);
+        expectTrue("Validation report includes Tier 4", reportText.find("Tier 4 Correlation") != std::string::npos);
+        expectTrue("Validation report includes Tier 5", reportText.find("Tier 5 Dynamics") != std::string::npos);
+    }
     if (std::filesystem::exists(reportResult.markdownPath)) {
         std::filesystem::remove(reportResult.markdownPath);
     }

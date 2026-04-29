@@ -13,6 +13,7 @@
 - GPU timestamp-query timing for whole-frame, point-pass, and volume-pass measurements when supported by the driver/context
 - tracked GPU-memory estimates for the point VBO, volume 3D texture, and scene framebuffer
 - runtime FPS and build-time statistics in the Performance panel
+- deterministic release validation thresholds for non-GPU paths: solver execution, small cloud generation, report export, and package health checks
 
 ## Tunable Controls
 
@@ -55,12 +56,13 @@ The UI exposes:
 - local Windows build passes and launches
 - local test suite passes, including fixed and adaptive cloud-generation-stat checks
 - numerical-radial cloud overrides are covered by a deterministic test with a synthetic radial cache
+- Tier 2 mean-field, Tier 4 correlation, Tier 5 dynamics, validation report export, and package resources are included in release validation
 - GPU timings are driver-dependent and fall back to zeroed values when timestamp queries are unavailable
 - GPU memory is an application-side estimate of owned buffers/textures/framebuffer attachments, not a vendor-reported total
+- OpenCppCoverage is used when available; otherwise the release process writes `docs/reports/coverage-matrix.md` and gates on critical module test evidence
 
 ## Recommended Next Steps
 
-1. Move point and volume generation to a worker thread.
-2. Replace CPU-side volume rebuilds with sparse brick updates or a compute path.
-3. Add occlusion-aware or screen-space-error LOD selection instead of distance-only thresholds.
-4. Integrate vendor-specific memory telemetry where available.
+1. Replace CPU-side volume rebuilds with sparse brick updates or a compute path.
+2. Add occlusion-aware or screen-space-error LOD selection instead of distance-only thresholds.
+3. Integrate vendor-specific memory telemetry where available.

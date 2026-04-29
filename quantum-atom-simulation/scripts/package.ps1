@@ -3,6 +3,7 @@ param(
     [string]$Configuration = "Release",
     [switch]$Build,
     [switch]$IncludeTests,
+    [switch]$Verify,
     [string]$ProjectRoot
 )
 
@@ -34,6 +35,11 @@ if (-not (Test-Path $appExe)) {
 
 $packageRoot = Join-Path $root ("dist/windows/x64/$configDir/quantum_atom_simulation")
 if (Test-Path $packageRoot) {
+    $resolvedPackageRoot = (Resolve-Path $packageRoot).Path
+    $resolvedDistRoot = (Resolve-Path (Join-Path $root "dist")).Path
+    if (-not $resolvedPackageRoot.StartsWith($resolvedDistRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "refusing to remove package path outside dist: $resolvedPackageRoot"
+    }
     Remove-Item -Recurse -Force $packageRoot
 }
 New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
@@ -73,3 +79,20 @@ $launcherPath = Join-Path $packageRoot "run_app.bat"
 New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "logs") | Out-Null
 
 Write-Host "[package] created: $packageRoot"
+
+if ($Verify) {
+    $verifyArgs = @(
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "verify_package.ps1"),
+        "-Configuration", $Configuration,
+        "-ProjectRoot", $root,
+        "-PackageRoot", $packageRoot
+    )
+    if ($IncludeTests) {
+        $verifyArgs += "-IncludeTests"
+    }
+    & powershell @verifyArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "package verification failed with exit code $LASTEXITCODE"
+    }
+}

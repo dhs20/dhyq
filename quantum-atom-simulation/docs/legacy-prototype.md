@@ -13,14 +13,14 @@
 - [validation](/D:/project/dhyq/quantum-atom-simulation/validation)
 - [include/quantum](/D:/project/dhyq/quantum-atom-simulation/include/quantum)
 
-这是当前 `xmake` 主构建线和 Windows MVP 交付路径。
+这是当前 `xmake` 主构建线和 Windows 0.3.1 交付路径。
 
 ## Legacy 原型
 
 - [legacy/src](/D:/project/dhyq/quantum-atom-simulation/legacy/src)
 - [legacy/include](/D:/project/dhyq/quantum-atom-simulation/legacy/include)
 
-这些文件来自早期 freeglut/OpenGL 教学原型，当前不参与主构建，也不应被用于描述现有 MVP 的能力范围。
+这些文件来自早期 freeglut/OpenGL 教学原型，当前不参与主构建，也不应被用于描述现有 0.3.1 的能力范围。
 
 ## 处理原则
 

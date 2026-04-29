@@ -21,7 +21,11 @@
 - [run.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/run.ps1)：运行程序，可选先跑测试
 - [build_and_run.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/build_and_run.ps1)：构建、测试、运行
 - [package.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/package.ps1)：生成 `dist/` 发版目录
+- [verify_package.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/verify_package.ps1)：检查发行包文件、资产、日志目录并运行包内健康检查
+- [health_check.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/health_check.ps1)：无窗口资源/数据健康检查
 - [smoke_test.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/smoke_test.ps1)：启动程序并做最小冒烟验证
+- [coverage_report.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/coverage_report.ps1)：OpenCppCoverage 可用时生成行覆盖率，否则生成模块覆盖矩阵
+- [validate_release.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/validate_release.ps1)：串联构建、测试、健康检查、smoke、打包验证和覆盖报告
 
 对应的 `.bat` 包装脚本也已经提供，方便直接双击验证。
 
@@ -66,6 +70,12 @@ cd D:\project\dhyq\quantum-atom-simulation
 powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -Configuration Release -Build -IncludeTests
 ```
 
+带包完整性校验：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -Configuration Release -Build -IncludeTests -Verify
+```
+
 发版目录输出到：
 
 - `dist/windows/x64/release/quantum_atom_simulation/`
@@ -88,6 +98,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -Configuration Re
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1 -Configuration Release
 ```
 
+资源/数据健康检查：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\health_check.ps1 -Configuration Release
+```
+
+完整 Release 验证：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\validate_release.ps1 -Configuration Release
+```
+
 完整项目验证入口：
 
 - [verify_project.bat](/D:/project/dhyq/quantum-atom-simulation/verify_project.bat)
@@ -97,6 +119,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1 -Configuration
 - `xmake` 构建
 - `quantum_atom_tests.exe`
 - `smoke_test.ps1`
+
+## 离线依赖缓存
+
+`xmake.lua` 不再默认绑定仓库旁的 `.xmake-pkg-install` 目录。需要使用离线包缓存时，可以：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Configuration Release -LocalPackageRoot D:\project\dhyq\.xmake-pkg-install
+```
+
+脚本也会在发现 `XMAKE_PKG_INSTALLDIR` 或仓库旁共享缓存目录时自动传入 `local_pkg_root`，以保持离线可复现构建。
 
 ## 可执行文件位置
 
@@ -157,4 +189,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1 -Configuration
 
 - 当前主线源码不再使用旧 `src/` 和旧根头文件
 - 历史原型代码已迁移到 [legacy](/D:/project/dhyq/quantum-atom-simulation/legacy)
-- `legacy/` 仅供参考，不参与当前 MVP 主构建
+- `legacy/` 仅供参考，不参与当前 0.3.1 主构建
