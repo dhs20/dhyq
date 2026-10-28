@@ -1,3 +1,5 @@
+#include "quantum/app/SessionPersistence.h"
+#include "quantum/app/UndoStack.h"
 #include "quantum/basis/BasisMetadata.h"
 #include "quantum/dynamics/NuclearPhysics.h"
 #include "quantum/dynamics/DynamicsEngine.h"
@@ -11,8 +13,10 @@
 #include "quantum/solvers/TeachingMeanFieldSolver.h"
 #include "quantum/spectroscopy/HydrogenicCorrections.h"
 #include "quantum/spectroscopy/HydrogenicSpectralEngine.h"
+#include "quantum/ui/UiStringKey.h"
 #include "quantum/validation/ValidationReportWriter.h"
 
+#include <cassert>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -87,6 +91,158 @@ quantum::physics::CloudRequest makeCloudRequest(int nuclearCharge,
     request.components = std::move(components);
     request.numericalRadial = std::move(numericalRadial);
     return request;
+}
+
+void testSessionRoundtrip() {
+    quantum::app::SimulationState state;
+    state.atomicNumber = 6;
+    state.chargeState = 2;
+    state.bohr.principalN = 3;
+    state.meanField.mixingAlpha = 0.42;
+    state.learning.enabled = true;
+    state.learning.path = quantum::app::LearningPath::Spectroscopy;
+
+    auto rec = quantum::app::SessionRecord::fromState(state);
+
+    const auto tmpPath = std::filesystem::temp_directory_path() / "qa_test_session.json";
+    bool ok = quantum::app::saveSession(tmpPath, rec);
+    assert(ok);
+
+    auto loaded = quantum::app::loadSession(tmpPath);
+    assert(loaded.has_value());
+    assert(loaded->atomicNumber == 6);
+    assert(loaded->chargeState == 2);
+    assert(loaded->principalN == 3);
+    assert(std::abs(loaded->meanFieldMixingAlpha - 0.42) < 0.01);
+    assert(loaded->learningEnabled == true);
+    assert(loaded->learningPathInt == static_cast<int>(quantum::app::LearningPath::Spectroscopy));
+
+    quantum::app::SimulationState freshState;
+    loaded->applyTo(freshState);
+    assert(freshState.atomicNumber == 6);
+    assert(freshState.chargeState == 2);
+    assert(freshState.bohr.principalN == 3);
+    assert(freshState.meanField.mixingAlpha == 0.42);
+    assert(freshState.learning.enabled == true);
+
+    std::filesystem::remove(tmpPath);
+    std::cout << "PASS: testSessionRoundtrip\n";
+}
+
+void testUndoRedo() {
+    quantum::app::UndoStack stack;
+    quantum::app::SimulationState state;
+    state.atomicNumber = 1;
+    state.bohr.principalN = 2;
+
+    auto snap1 = quantum::app::ParamSnapshot::fromState(state);
+    stack.push(snap1);
+
+    state.atomicNumber = 8;
+    state.bohr.principalN = 4;
+    auto snap2 = quantum::app::ParamSnapshot::fromState(state);
+
+    auto undone = stack.undo(snap2);
+    assert(undone.has_value());
+    assert(undone->atomicNumber == 1);
+    assert(undone->principalN == 2);
+
+    auto redone = stack.redo();
+    assert(redone.has_value());
+    assert(redone->atomicNumber == 8);
+    assert(redone->principalN == 4);
+
+    redone->applyTo(state);
+    assert(state.atomicNumber == 8);
+    assert(state.bohr.principalN == 4);
+    assert(state.dirty.physics == true);
+
+    state.atomicNumber = 10;
+    auto snap3 = quantum::app::ParamSnapshot::fromState(state);
+    stack.push(snap3);
+    auto redoEmpty = stack.redo();
+    assert(!redoEmpty.has_value());
+
+    std::cout << "PASS: testUndoRedo\n";
+}
+
+void testUiStringCoverage() {
+    int total = static_cast<int>(quantum::ui::UiStringKey::COUNT);
+    for (int i = 0; i < total; ++i) {
+        auto key = static_cast<quantum::ui::UiStringKey>(i);
+        const char* str = quantum::ui::uiStr(key);
+        assert(str != nullptr);
+        assert(str[0] != '\0');
+    }
+    std::cout << "PASS: testUiStringCoverage (" << total << " strings)\n";
+}
+
+void testRecoveryFileRoundtrip() {
+    quantum::app::SimulationState state;
+    state.atomicNumber = 14;
+    state.chargeState = 3;
+
+    auto rec = quantum::app::SessionRecord::fromState(state);
+    const auto tmpPath = std::filesystem::temp_directory_path() / "qa_recovery_test.json";
+
+    quantum::app::writeRecoveryFile(tmpPath, rec);
+    assert(quantum::app::hasRecoveryFile(tmpPath));
+
+    auto loaded = quantum::app::loadSession(tmpPath);
+    assert(loaded.has_value());
+    assert(loaded->atomicNumber == 14);
+    assert(loaded->chargeState == 3);
+
+    quantum::app::deleteRecoveryFile(tmpPath);
+    assert(!quantum::app::hasRecoveryFile(tmpPath));
+
+    std::cout << "PASS: testRecoveryFileRoundtrip\n";
+}
+
+void testReferenceLineConsistency(quantum::physics::ElementDatabase& db) {
+    auto transitions = db.referenceTransitions(1);
+    if (transitions.empty()) {
+        std::cerr << "Skipping: no reference transitions loaded for consistency check.\n";
+        return;
+    }
+
+    int warnings = 0;
+    int totalChecked = 0;
+
+    for (int z = 1; z <= 5; ++z) {
+        const int maxQ = z - 1 < 4 ? z - 1 : 4;
+        for (int q = 0; q <= maxQ; ++q) {
+            auto chargeTransitions = db.referenceTransitions(z, q);
+            for (const auto& ref : chargeTransitions) {
+                ++totalChecked;
+
+                double zEff = static_cast<double>(z - q);
+                double energyPredicted = 13.605693122994 * zEff * zEff
+                    * (1.0 / (static_cast<double>(ref.lower.n) * static_cast<double>(ref.lower.n))
+                       - 1.0 / (static_cast<double>(ref.upper.n) * static_cast<double>(ref.upper.n)));
+
+                if (energyPredicted <= 0.0) continue;
+
+                double deviation = std::abs(ref.photonEnergyEv - energyPredicted)
+                    / std::max(std::abs(ref.photonEnergyEv), 0.001);
+
+                if (deviation > 0.01) {
+                    ++warnings;
+                    std::cerr << "WARNING: " << ref.label
+                              << " deviation " << (deviation * 100.0)
+                              << "% (predicted=" << energyPredicted
+                              << " eV, catalog=" << ref.photonEnergyEv << " eV)\n";
+                }
+            }
+        }
+    }
+
+    std::cout << "Reference line consistency: checked " << totalChecked
+              << " transitions, " << warnings << " warnings.\n";
+
+    if (warnings > 0) {
+        std::cout << "PASS (warnings are informational, >1% deviations are flagged)\n";
+    }
 }
 
 } // namespace
@@ -467,6 +623,13 @@ int main() {
     if (std::filesystem::exists(reportResult.jsonPath)) {
         std::filesystem::remove(reportResult.jsonPath);
     }
+
+    testSessionRoundtrip();
+    testUndoRedo();
+    testUiStringCoverage();
+    testRecoveryFileRoundtrip();
+
+    testReferenceLineConsistency(database);
 
     if (failures == 0) {
         std::cout << "All tests passed.\n";

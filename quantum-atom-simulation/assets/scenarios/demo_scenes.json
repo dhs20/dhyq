@@ -171,6 +171,295 @@
         "created_by": "assets",
         "notes": "Hyperfine and finite-basis dynamics teaching preset."
       }
+    },
+    {
+      "name": "Hydrogen Schrodinger Cloud",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "approximation": "strict_hydrogenic",
+      "model": "schrodinger_cloud",
+      "transition": { "initial": [2, 0, 0], "final": [1, 0, 0] },
+      "components": [
+        { "qn": [2, 0, 0], "amplitude": 1.0, "phase": 0.0 }
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "strict hydrogenic teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Pedagogical probability cloud visualization for hydrogen 2s orbital.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": false,
+        "includes_external_field": false,
+        "is_time_dependent": false,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-h-schrodinger-cloud",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "Schrodinger probability cloud for hydrogen 2s orbital."
+      }
+    },
+    {
+      "name": "Hydrogen Superposition",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "approximation": "strict_hydrogenic",
+      "model": "schrodinger_cloud",
+      "transition": { "initial": [2, 1, 0], "final": [2, 0, 0] },
+      "components": [
+        { "qn": [2, 0, 0], "amplitude": 0.7, "phase": 0.0 },
+        { "qn": [2, 1, 0], "amplitude": 0.5, "phase": 1.57 }
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "strict hydrogenic teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Superposition state visualization for hydrogen.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": false,
+        "includes_external_field": false,
+        "is_time_dependent": false,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-h-superposition",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "2s+2p superposition phase cloud preset."
+      }
+    },
+    {
+      "name": "Li-Ne Configuration Trend",
+      "atomic_number": 3,
+      "charge_state": 0,
+      "approximation": "multi_electron_approximation",
+      "model": "compare",
+      "transition": { "initial": [2, 1, 0], "final": [1, 0, 0] },
+      "components": [
+        { "qn": [2, 1, 0], "amplitude": 1.0, "phase": 0.0 }
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "multi-electron teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Aufbau principle visualization for Z=3 through Z=10.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": false,
+        "includes_external_field": false,
+        "is_time_dependent": false,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-li-ne-trend",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "Li through Ne Aufbau trend preset."
+      }
+    },
+    {
+      "name": "Na-Ar Period Trend",
+      "atomic_number": 11,
+      "charge_state": 0,
+      "approximation": "multi_electron_approximation",
+      "model": "compare",
+      "transition": { "initial": [3, 1, 0], "final": [3, 0, 0] },
+      "components": [
+        { "qn": [3, 0, 0], "amplitude": 1.0, "phase": 0.0 }
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "multi-electron teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Z_eff screening trend for Z=11 through Z=18.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": false,
+        "includes_external_field": false,
+        "is_time_dependent": false,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-na-ar-trend",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "Na through Ar period trend preset."
+      }
+    },
+    {
+      "name": "Hydrogen Spectral Series",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "approximation": "strict_hydrogenic",
+      "model": "bohr",
+      "transition": { "initial": [4, 1, 0], "final": [3, 2, 0] },
+      "components": [
+        { "qn": [4, 1, 0], "amplitude": 1.0, "phase": 0.0 }
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "strict hydrogenic teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Lyman/Balmer/Paschen series visualization.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": false,
+        "includes_external_field": false,
+        "is_time_dependent": false,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-h-spectral-series",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "Hydrogen Lyman/Balmer/Paschen spectral series preset."
+      }
+    },
+    {
+      "name": "Fine Structure Splitting",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "approximation": "strict_hydrogenic",
+      "model": "bohr",
+      "transition": { "initial": [2, 1, 0], "final": [1, 0, 0] },
+      "components": [
+        { "qn": [2, 1, 0], "amplitude": 1.0, "phase": 0.0 }
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "Tier 3 teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Fine structure 2p splitting visualization.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": true,
+        "includes_external_field": false,
+        "is_time_dependent": false,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-fine-structure",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "Spin-orbit fine structure splitting preset."
+      }
+    },
+    {
+      "name": "Zeeman Effect",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "approximation": "strict_hydrogenic",
+      "model": "bohr",
+      "transition": { "initial": [2, 1, 0], "final": [1, 0, 0] },
+      "components": [
+        { "qn": [2, 1, 0], "amplitude": 1.0, "phase": 0.0 }
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "Tier 3 teaching preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "Zeeman splitting in external magnetic field.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": true,
+        "includes_external_field": true,
+        "is_time_dependent": false,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-zeeman",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "Zeeman effect in magnetic field preset."
+      }
+    },
+    {
+      "name": "D-T Fusion Demo",
+      "atomic_number": 1,
+      "charge_state": 0,
+      "approximation": "strict_hydrogenic",
+      "model": "bohr",
+      "transition": { "initial": [2, 0, 0], "final": [1, 0, 0] },
+      "components": [
+        { "qn": [2, 0, 0], "amplitude": 1.0, "phase": 0.0 }
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "Teaching visualization preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "D-T fusion cross-section visualization.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": false,
+        "includes_external_field": false,
+        "is_time_dependent": true,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-dt-fusion",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "D-T fusion cross-section teaching preset."
+      }
+    },
+    {
+      "name": "U-235 Fission Demo",
+      "atomic_number": 92,
+      "charge_state": 0,
+      "approximation": "multi_electron_approximation",
+      "model": "bohr",
+      "transition": { "initial": [2, 0, 0], "final": [1, 0, 0] },
+      "components": [
+        { "qn": [2, 0, 0], "amplitude": 1.0, "phase": 0.0 }
+      ],
+      "method": {
+        "method_name": "Scene preset selection",
+        "approximation": "Teaching visualization preset",
+        "data_source": "Built-in scripted scene preset",
+        "validation_summary": "U-235 fission chain reaction visualization.",
+        "includes_electron_correlation": false,
+        "enforces_antisymmetry": false,
+        "includes_relativity": false,
+        "includes_external_field": false,
+        "is_time_dependent": true,
+        "caveats": [
+          "Scene presets control visualization and parameter defaults.",
+          "They do not imply research-grade validation."
+        ]
+      },
+      "provenance": {
+        "record_id": "demo-scene-u235-fission",
+        "source_id": "demo-scenes",
+        "created_by": "assets",
+        "notes": "U-235 fission chain reaction teaching preset."
+      }
     }
   ]
 }

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "quantum/dynamics/NuclearPhysics.h"
 #include "quantum/meta/MethodMetadata.h"
@@ -44,6 +44,20 @@ enum class SamplingQualityPreset {
     HighFidelity
 };
 
+enum class ColorMap {
+    PhaseHue,
+    HeatMap,
+    BlueWhite,
+    Rainbow,
+    Grayscale
+};
+
+enum class CloudColorMode {
+    ByPhase,
+    ByRadialDistance,
+    ByProbabilityDensity
+};
+
 enum class NuclearAnimationMode {
     None,
     ParticleZoo,
@@ -86,6 +100,8 @@ struct CloudSettings {
     bool buildVolume = true;
     bool showPhase = true;
     bool useNumericalRadial = false;
+    ColorMap colorMap = ColorMap::PhaseHue;
+    CloudColorMode cloudColorMode = CloudColorMode::ByPhase;
     std::vector<quantum::physics::SuperpositionComponent> components{{{2, 1, 0}, 1.0, 0.0, 1.0}};
 };
 
@@ -105,6 +121,8 @@ struct MeanFieldSettings {
     quantum::solvers::MeanFieldMode mode = quantum::solvers::MeanFieldMode::HartreeScreened;
     int maxIterations = 40;
     double convergenceTolerance = 1.0e-6;
+    double mixingAlpha = 0.3;
+    bool useMixing = true;
 };
 
 struct CorrelationSettings {
@@ -150,6 +168,21 @@ struct NuclearAnimationSettings {
     double slabThicknessCm = 2.0;
     double decayHalfLifeSeconds = 1.0;
     double decayObservationWindowSeconds = 5.0;
+};
+
+enum class LearningPath {
+    None,
+    AtomicStructure,
+    Spectroscopy,
+    MultiElectron,
+    NuclearPhysics
+};
+
+struct LearningParams {
+    bool enabled = false;
+    LearningPath path = LearningPath::None;
+    int stepIndex = 0;
+    std::string guideText;
 };
 
 struct ReferenceSettings {
@@ -259,6 +292,7 @@ struct SimulationState {
     quantum::spectroscopy::SpectroscopySettings spectroscopy;
     ViewSettings view;
     NuclearAnimationSettings nuclearAnimation;
+    LearningParams learning;
     ReferenceSettings reference;
     ReportingSettings reporting;
     AutoDemoSettings demo;

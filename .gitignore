@@ -22,3 +22,9 @@
 *.log
 imgui.ini
 CppProperties.json
+
+# 本地构建日志（quantum-atom-simulation）
+quantum-atom-simulation/build_*.txt
+quantum-atom-simulation/cl_error*.txt
+quantum-atom-simulation/run_build.bat
+quantum-atom-simulation/run_build.ps1

@@ -50,6 +50,12 @@ cd D:\project\dhyq\quantum-atom-simulation
 powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Configuration Release
 ```
 
+如果目标可执行文件还没生成，可以直接加 `-BuildIfMissing`：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Configuration Release -BuildIfMissing
+```
+
 带测试运行：
 
 ```powershell
@@ -102,6 +108,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1 -Configuration
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\health_check.ps1 -Configuration Release
+```
+
+健康检查脚本也支持缺失时自动构建：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\health_check.ps1 -Configuration Release -BuildIfMissing
+```
+
+也可以直接调用程序本体：
+
+```powershell
+.\build\windows\x64\release\quantum_atom_simulation.exe --health-check
 ```
 
 完整 Release 验证：

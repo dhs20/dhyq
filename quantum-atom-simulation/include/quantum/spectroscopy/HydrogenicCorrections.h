@@ -42,13 +42,18 @@ struct StateCorrection {
 struct SpectroscopyCorrectionResult {
     bool applied = false;
     bool starkApproximationLimited = false;
+    bool paschenBackRegime = false;
     std::string notes;
+    std::string paschenBackNote;
+    std::string starkNote;
     StateCorrection initial;
     StateCorrection final;
     double correctedDeltaEnergyEv = 0.0;
     double correctedWavelengthNm = 0.0;
     std::string initialTermSymbol;
     std::string finalTermSymbol;
+    int fTotal = 0;
+    std::string fLabel;
     quantum::meta::MethodStamp method;
     std::vector<quantum::meta::ValidationRecord> validation;
 };

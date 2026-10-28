@@ -150,6 +150,10 @@ GLuint Framebuffer::colorTexture() const {
     return colorTexture_;
 }
 
+GLuint Framebuffer::fbo() const {
+    return framebuffer_;
+}
+
 int Framebuffer::width() const {
     return width_;
 }

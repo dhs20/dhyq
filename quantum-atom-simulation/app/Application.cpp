@@ -1,4 +1,6 @@
-﻿#include "quantum/app/Application.h"
+#include "quantum/app/Application.h"
+
+#include "quantum/ui/UiStringKey.h"
 
 #include <GL/glew.h>
 #include <imgui.h>
@@ -480,6 +482,8 @@ DemoScriptStep demoStepFromJson(const nlohmann::json& node) {
     step.buildVolume = node.value("build_volume", true);
     step.principalN = node.value("principal_n", 2);
     step.maxSpectrumN = node.value("max_spectrum_n", 6);
+    step.category = node.value("category", std::string("all"));
+    step.description = node.value("description", std::string(""));
     if (node.contains("transition")) {
         const auto& transitionNode = node.at("transition");
         if (transitionNode.contains("initial")) {
@@ -532,6 +536,8 @@ const std::array<DemoScriptStep, 3>& builtInDemoSteps() {
          false,
          2,
          6,
+         "hydrogen",
+         "氢原子玻尔轨道能级与跃迁",
          {{2, 1, 0}, {1, 0, 0}, true, false},
          {0.2f, 0.45f, 10.0f, glm::vec3(0.0f, 0.2f, 0.0f)}},
         {"氦离子相位云",
@@ -546,6 +552,8 @@ const std::array<DemoScriptStep, 3>& builtInDemoSteps() {
          true,
          3,
          7,
+         "hydrogen",
+         "类氢离子的 Z² 缩放效应与相位云",
          {{3, 2, 0}, {2, 1, 0}, true, false},
          {1.15f, 0.6f, 14.0f, glm::vec3(0.0f, 0.6f, 0.0f)}},
         {"氖原子多电子近似",
@@ -560,6 +568,8 @@ const std::array<DemoScriptStep, 3>& builtInDemoSteps() {
          true,
          2,
          6,
+         "multielectron",
+         "氖原子多电子教学近似与相位云",
          {{3, 1, 0}, {2, 0, 0}, true, false},
          {-0.75f, 0.4f, 16.0f, glm::vec3(0.0f, 0.3f, 0.0f)}}}};
     return kSteps;
@@ -616,6 +626,12 @@ bool Application::initialize() {
     loadDefaultDemoScript();
     lastFrameSeconds_ = glfwGetTime();
     recomputeDerived();
+
+    const auto recoveryPath = projectRoot_ / "docs" / "reports" / "sessions" / "recovery.json";
+    if (quantum::app::hasRecoveryFile(recoveryPath)) {
+        showRecoveryDialog_ = true;
+    }
+
     logger_.info("应用初始化完成。");
     return true;
 }
@@ -634,6 +650,32 @@ int Application::run() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        if (showRecoveryDialog_) {
+            ImGui::OpenPopup("##recovery_dialog");
+            showRecoveryDialog_ = false;
+        }
+        if (ImGui::BeginPopupModal("##recovery_dialog", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextUnformatted(quantum::ui::uiStr(quantum::ui::UiStringKey::Status_RecoveryTitle));
+            const auto recoveryPath = projectRoot_ / "docs" / "reports" / "sessions" / "recovery.json";
+            auto rec = quantum::app::loadSession(recoveryPath);
+            if (rec) {
+                ImGui::Text(quantum::ui::uiStr(quantum::ui::UiStringKey::Status_RecoveryPrompt), rec->timestamp.c_str());
+            }
+            if (ImGui::Button(quantum::ui::uiStr(quantum::ui::UiStringKey::Status_Recover), ImVec2(120, 0))) {
+                if (rec) {
+                    rec->applyTo(state_);
+                    recomputeDerived();
+                }
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(quantum::ui::uiStr(quantum::ui::UiStringKey::Status_Discard), ImVec2(180, 0))) {
+                quantum::app::deleteRecoveryFile(recoveryPath);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
         const auto uiFrame =
             appUi_.draw(state_, elementDatabase_, performance_.snapshot(), logger_, sceneRenderer_.sceneTexture(), sceneRenderer_.size());
 
@@ -647,6 +689,9 @@ int Application::run() {
         updateAutoDemo(deltaSeconds);
         camera_.update(static_cast<float>(deltaSeconds));
 
+        if (!undoRedoInProgress_) {
+            undoStack_.push(quantum::app::ParamSnapshot::fromState(state_));
+        }
         recomputeDerived();
         processReportRequests();
         const auto renderStats = sceneRenderer_.render(state_, camera_);
@@ -663,6 +708,50 @@ int Application::run() {
                                     renderStats.volumeTextureBytes,
                                     renderStats.framebufferBytes);
 
+        if (ImGui::IsKeyPressed(ImGuiKey_S) && ImGui::GetIO().KeyCtrl &&
+            !ImGui::GetIO().WantTextInput) {
+            const auto screenshotDir = projectRoot_ / "docs" / "reports" / "screenshots";
+            std::filesystem::create_directories(screenshotDir);
+
+            auto now = std::chrono::system_clock::now();
+            auto timeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now.time_since_epoch()).count();
+            std::ostringstream filename;
+            filename << "screenshot_" << timeMs << ".ppm";
+            const auto path = screenshotDir / filename.str();
+
+            int w, h;
+            glfwGetFramebufferSize(window_, &w, &h);
+
+            if (sceneRenderer_.captureScreenshot(path, w, h)) {
+                logger_.info("截图已保存: " + path.string());
+            } else {
+                logger_.warn("截图保存失败: " + path.string());
+            }
+        }
+
+        if (ImGui::IsKeyPressed(ImGuiKey_Z) && ImGui::GetIO().KeyCtrl &&
+            !ImGui::GetIO().WantTextInput && !ImGui::GetIO().WantCaptureKeyboard) {
+            auto current = quantum::app::ParamSnapshot::fromState(state_);
+            auto undone = undoStack_.undo(current);
+            if (undone) {
+                undoRedoInProgress_ = true;
+                undone->applyTo(state_);
+                recomputeDerived();
+                undoRedoInProgress_ = false;
+            }
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Y) && ImGui::GetIO().KeyCtrl &&
+            !ImGui::GetIO().WantTextInput && !ImGui::GetIO().WantCaptureKeyboard) {
+            auto redone = undoStack_.redo();
+            if (redone) {
+                undoRedoInProgress_ = true;
+                redone->applyTo(state_);
+                recomputeDerived();
+                undoRedoInProgress_ = false;
+            }
+        }
+
         ImGui::Render();
         int displayWidth = 0;
         int displayHeight = 0;
@@ -672,6 +761,17 @@ int Application::run() {
         glClearColor(0.02f, 0.02f, 0.02f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        {
+            static double autoSaveTimer = 0.0;
+            autoSaveTimer += deltaSeconds;
+            if (autoSaveTimer >= 300.0) {
+                autoSaveTimer = 0.0;
+                const auto sessionPath = projectRoot_ / "docs" / "reports" / "sessions" / "recovery.json";
+                auto rec = quantum::app::SessionRecord::fromState(state_);
+                quantum::app::writeRecoveryFile(sessionPath, rec);
+            }
+        }
 
         glfwSwapBuffers(window_);
         performance_.endFrame();
@@ -756,6 +856,9 @@ void Application::shutdown() {
         window_ = nullptr;
     }
     glfwTerminate();
+
+    const auto recoveryPath = projectRoot_ / "docs" / "reports" / "sessions" / "recovery.json";
+    quantum::app::deleteRecoveryFile(recoveryPath);
 }
 
 void Application::recomputeDerived() {
@@ -849,6 +952,8 @@ void Application::recomputeDerived() {
             meanFieldRequest.mode = state_.meanField.mode;
             meanFieldRequest.maxIterations = state_.meanField.maxIterations;
             meanFieldRequest.convergenceTolerance = state_.meanField.convergenceTolerance;
+            meanFieldRequest.mixingAlpha = state_.meanField.mixingAlpha;
+            meanFieldRequest.useMixing = state_.meanField.useMixing;
             state_.derived.meanField = meanFieldSolver_.solve(meanFieldRequest);
         } else {
             state_.derived.meanField = {};

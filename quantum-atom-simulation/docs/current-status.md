@@ -164,6 +164,8 @@
 
 - `xmake` 主构建链
 - `build / run / package / smoke test` 脚本
+- `run.ps1` 与 `health_check.ps1` 的 `-BuildIfMissing` 启动入口
+- 应用程序本体可直接通过 `--health-check` 做资源与数据检查
 - `dist/` 打包发布目录
 - 本地测试与冒烟启动验证
 - Windows CI 骨架

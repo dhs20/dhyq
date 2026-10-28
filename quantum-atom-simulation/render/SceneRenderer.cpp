@@ -8,6 +8,8 @@
 #include <chrono>
 #include <cstddef>
 #include <cmath>
+#include <cstring>
+#include <fstream>
 #include <vector>
 
 namespace quantum::render {
@@ -88,6 +90,9 @@ vec3 hsv2rgb(vec3 c) {
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
+// TODO: Task 14 — 支持 ColorMap (热力图/蓝白/彩虹/灰度) 和 CloudColorMode (径向距离/概率密度)。
+// 当前仅使用 HSV 相位色相映射。后续可在 host 端 (CloudGenerator) 根据 colorMap/cloudColorMode
+// 预计算 vPhase 值以复用现有 HSV 逻辑，或扩展 shader uniform 传入色图参数。
 void main() {
     vec2 coord = gl_PointCoord * 2.0 - 1.0;
     float radius = dot(coord, coord);
@@ -143,6 +148,7 @@ vec3 hsv2rgb(vec3 c) {
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
+// TODO: Task 14 — 见 kPointFragmentShader 中同名注释。
 void main() {
     vec2 sampleValue = texture(uVolumeTexture, vTexCoord).rg;
     float density = sampleValue.r;
@@ -588,6 +594,9 @@ void SceneRenderer::uploadCloud(const quantum::physics::CloudData& cloud) {
                               GL_FALSE,
                               sizeof(quantum::physics::CloudPoint),
                               reinterpret_cast<void*>(offsetof(quantum::physics::CloudPoint, phase)));
+        glVertexAttribDivisor(0, 1);
+        glVertexAttribDivisor(1, 1);
+        glVertexAttribDivisor(2, 1);
         glBindVertexArray(0);
     }
 
@@ -1123,7 +1132,7 @@ void SceneRenderer::renderPointCloud(const quantum::app::SimulationState& state,
 
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     glBindVertexArray(pointVao_);
-    glDrawArrays(GL_POINTS, 0, std::min<GLsizei>(pointCount_, static_cast<GLsizei>(renderedPointCount)));
+    glDrawArraysInstanced(GL_POINTS, 0, 1, std::min<GLsizei>(pointCount_, static_cast<GLsizei>(renderedPointCount)));
     glBindVertexArray(0);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
@@ -1157,6 +1166,32 @@ void SceneRenderer::renderVolume(const quantum::app::SimulationState& state,
         quadMesh_.draw();
     }
     glDepthMask(GL_TRUE);
+}
+
+bool SceneRenderer::captureScreenshot(const std::filesystem::path& outputPath, int width, int height) const {
+    if (width <= 0 || height <= 0) {
+        return false;
+    }
+    std::vector<unsigned char> pixels(static_cast<std::size_t>(width * height * 3));
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_.fbo());
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+
+    const int rowBytes = width * 3;
+    std::vector<unsigned char> flipped(pixels.size());
+    for (int y = 0; y < height; ++y) {
+        std::memcpy(flipped.data() + y * rowBytes,
+                    pixels.data() + (height - 1 - y) * rowBytes,
+                    static_cast<std::size_t>(rowBytes));
+    }
+
+    std::ofstream file(outputPath, std::ios::binary);
+    if (!file.is_open()) {
+        return false;
+    }
+    file << "P6\n" << width << " " << height << "\n255\n";
+    file.write(reinterpret_cast<const char*>(flipped.data()), static_cast<std::streamsize>(flipped.size()));
+    return file.good();
 }
 
 } // namespace quantum::render

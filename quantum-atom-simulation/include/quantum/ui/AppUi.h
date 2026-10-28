@@ -7,6 +7,11 @@
 
 #include <GL/glew.h>
 #include <glm/vec2.hpp>
+#include <imgui.h>
+
+#include <string>
+
+struct ImRect;
 
 namespace quantum::ui {
 
@@ -40,6 +45,24 @@ private:
     mutable int nuclearCrossSectionSelectionIndex_ = -1;
     mutable int nuclearTransportSelectionIndex_ = -1;
     mutable int nuclearDecaySelectionIndex_ = -1;
+
+    void drawChartPanels(quantum::app::SimulationState& state) const;
+
+    mutable bool showAdvancedPanels_ = false;
 };
+
+void drawSceneStatusOverlay(const ImRect& rect,
+                            const quantum::app::SimulationState& state,
+                            const quantum::core::PerformanceSnapshot& performance);
+void drawCloudBuildProgress(const ImRect& rect, const quantum::core::PerformanceSnapshot& performance);
+void drawSceneHudOverlay(const ImRect& rect,
+                         const quantum::app::SimulationState& state);
+
+void drawLearningPanel(quantum::app::SimulationState& state);
+bool isParamLockedGlobal(const quantum::app::SimulationState& state, const std::string& key);
+
+void drawInspectorContent(quantum::app::SimulationState& state,
+                          const quantum::physics::ElementDatabase& elementDatabase,
+                          bool& showAdvancedPanels);
 
 } // namespace quantum::ui

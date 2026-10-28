@@ -38,6 +38,7 @@ public:
     static void bindDefault();
 
     [[nodiscard]] GLuint colorTexture() const;
+    [[nodiscard]] GLuint fbo() const;
     [[nodiscard]] int width() const;
     [[nodiscard]] int height() const;
 

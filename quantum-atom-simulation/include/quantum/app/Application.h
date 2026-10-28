@@ -1,6 +1,8 @@
 #pragma once
 
 #include "quantum/app/SimulationState.h"
+#include "quantum/app/UndoStack.h"
+#include "quantum/app/SessionPersistence.h"
 #include "quantum/core/Logger.h"
 #include "quantum/core/Paths.h"
 #include "quantum/core/PerformanceTracker.h"
@@ -48,6 +50,8 @@ struct DemoScriptStep {
     bool buildVolume = true;
     int principalN = 2;
     int maxSpectrumN = 6;
+    std::string category;
+    std::string description;
     TransitionSelection transition;
     quantum::render::OrbitCamera::Pose cameraPose;
     quantum::meta::MethodStamp method;
@@ -137,6 +141,9 @@ private:
     quantum::ui::AppUi appUi_;
     quantum::validation::ValidationReportWriter validationReportWriter_;
     SimulationState state_;
+    quantum::app::UndoStack undoStack_;
+    bool showRecoveryDialog_ = false;
+    bool undoRedoInProgress_ = false;
     std::future<CloudBuildOutput> cloudBuildFuture_;
     std::optional<CloudBuildInput> queuedCloudBuild_;
     std::vector<DemoScriptStep> loadedDemoSteps_;

@@ -86,6 +86,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Configuration Rele
 powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Configuration Release
 ```
 
+如果只想直接启动已构建版本，或者先做资源健康检查：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Configuration Release -BuildIfMissing
+powershell -ExecutionPolicy Bypass -File .\scripts\health_check.ps1 -Configuration Release -BuildIfMissing
+```
+
+也可以直接调用可执行文件：
+
+```powershell
+.\build\windows\x64\release\quantum_atom_simulation.exe --health-check
+```
+
 一键验证：
 
 ```powershell
@@ -106,6 +119,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\validate_release.ps1 -Configu
 - 程序：`build/windows/x64/<config>/quantum_atom_simulation.exe`
 - 测试：`build/windows/x64/<config>/quantum_atom_tests.exe`
 - 发行包：`dist/windows/x64/<config>/quantum_atom_simulation/`
+- 包启动器：`dist/windows/x64/<config>/quantum_atom_simulation/run_app.bat`
 - 运行日志：`logs/runtime.log`
 - 验证报告：`docs/reports/latest-validation-report.md` 和同名 `.json`
 - 生产就绪证据：`docs/reports/production-readiness-audit.md` 等交付报告

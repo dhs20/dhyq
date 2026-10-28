@@ -1,6 +1,6 @@
 # Upgrade Status
 
-更新日期：2026-04-29
+更新日期：2026-05-23
 
 ## 当前判断
 
@@ -29,6 +29,7 @@
   - [scripts/validate_release.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/validate_release.ps1)
   - [scripts/smoke_test.ps1](/D:/project/dhyq/quantum-atom-simulation/scripts/smoke_test.ps1)
 - 已支持 `dist/` 打包发布目录
+- 已补齐 `-BuildIfMissing` 启动与健康检查入口，程序本体可直接执行 `--health-check`
 - 已支持 `docs/reports/` 生产就绪证据集
 - 已加入 Windows CI 工作流：
   - [.github/workflows/windows-xmake.yml](/D:/project/dhyq/quantum-atom-simulation/.github/workflows/windows-xmake.yml)

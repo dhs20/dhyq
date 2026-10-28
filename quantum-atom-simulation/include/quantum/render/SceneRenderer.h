@@ -9,6 +9,7 @@
 
 #include <array>
 #include <cstddef>
+#include <filesystem>
 #include <string>
 
 namespace quantum::render {
@@ -47,6 +48,8 @@ public:
 
     [[nodiscard]] GLuint sceneTexture() const;
     [[nodiscard]] glm::ivec2 size() const;
+
+    [[nodiscard]] bool captureScreenshot(const std::filesystem::path& outputPath, int width, int height) const;
 
 private:
     struct LODDecision {

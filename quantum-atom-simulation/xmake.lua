@@ -61,7 +61,18 @@ target("quantum_atom_simulation")
 target("quantum_atom_tests")
     set_kind("binary")
     set_group("tests")
-    add_files("tests/**.cpp", "basis/**.cpp", "core/**.cpp", "data/**.cpp", "dynamics/**.cpp", "physics/**.cpp", "solvers/**.cpp", "spectroscopy/**.cpp", "validation/**.cpp")
+    add_files("tests/**.cpp",
+              "app/SessionPersistence.cpp",
+              "app/UndoStack.cpp",
+              "ui/UiStrings.cpp",
+              "basis/**.cpp",
+              "core/**.cpp",
+              "data/**.cpp",
+              "dynamics/**.cpp",
+              "physics/**.cpp",
+              "solvers/**.cpp",
+              "spectroscopy/**.cpp",
+              "validation/**.cpp")
     add_includedirs("include")
     add_packages("glm", "nlohmann_json")
     add_local_cached_package("glm", "1.0.1")

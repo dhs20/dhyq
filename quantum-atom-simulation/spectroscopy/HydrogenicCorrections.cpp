@@ -169,12 +169,33 @@ SpectroscopyCorrectionResult evaluateHydrogenicCorrections(const quantum::physic
             kBohrMagnetonEvPerTesla * result.initial.landeG * result.initial.mJ * settings.magneticFieldTesla;
         result.final.zeemanShiftEv =
             kBohrMagnetonEvPerTesla * result.final.landeG * result.final.mJ * settings.magneticFieldTesla;
+
+        if (settings.magneticFieldTesla > 5.0) {
+            result.paschenBackRegime = true;
+            result.paschenBackNote = "Zeeman 裂距接近精细结构裂距，处于 Paschen-Back 过渡区。";
+        } else {
+            result.paschenBackRegime = false;
+        }
     }
     if (settings.applyStark) {
         result.initial.starkShiftEv =
             starkShiftEv(request.nuclearCharge, request.initial, settings.electricFieldVPerM, result.starkApproximationLimited);
         result.final.starkShiftEv =
             starkShiftEv(request.nuclearCharge, request.final, settings.electricFieldVPerM, result.starkApproximationLimited);
+
+        if (settings.electricFieldVPerM > 0.0) {
+            const double a0 = 5.29177210903e-11;
+            const double e = 1.602176634e-19;
+            const double Eh = 4.3597447222071e-18;
+            const double fieldAu = settings.electricFieldVPerM * e * a0 / Eh;
+            if (request.initial.n == 2) {
+                result.initial.starkShiftEv += 3.0 * fieldAu * Eh / e;
+            }
+            if (request.final.n == 2) {
+                result.final.starkShiftEv += 3.0 * fieldAu * Eh / e;
+            }
+            result.starkNote = "n=2 quadratic Stark estimate (teaching level).";
+        }
     }
     if (settings.applyHyperfine) {
         result.initial.hyperfineShiftEv = hyperfineShiftEv(request.initial,
@@ -187,6 +208,11 @@ SpectroscopyCorrectionResult evaluateHydrogenicCorrections(const quantum::physic
                                                         result.final.j,
                                                         result.final.f,
                                                         settings.hyperfineAConstantMicroEv);
+
+        result.fTotal = static_cast<int>(settings.nuclearSpin + 0.5);
+        char labelBuffer[32];
+        snprintf(labelBuffer, sizeof(labelBuffer), "F = %d/2", static_cast<int>(2 * result.fTotal));
+        result.fLabel = labelBuffer;
     }
 
     result.initial.totalShiftEv =

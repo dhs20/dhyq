@@ -21,6 +21,8 @@ struct MeanFieldSolveRequest {
     MeanFieldMode mode = MeanFieldMode::HartreeScreened;
     int maxIterations = 50;
     double convergenceTolerance = 1.0e-8;
+    double mixingAlpha = 0.3;
+    bool useMixing = true;
 };
 
 struct MeanFieldSolveResult {

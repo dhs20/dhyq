@@ -116,7 +116,11 @@ MeanFieldSolveResult TeachingMeanFieldSolver::solve(const MeanFieldSolveRequest&
     for (int iteration = 0; iteration < maxIterations; ++iteration) {
         const double shellRelaxation = 0.06 * static_cast<double>(atomicNumber) / static_cast<double>(iteration + 2);
         const double target = std::max(1.0, baseTarget + shellRelaxation);
-        const double nextZeff = 0.58 * zeff + 0.42 * target;
+        double nextZeff = 0.58 * zeff + 0.42 * target;
+        if (request.useMixing && iteration > 0) {
+            const double alpha = request.mixingAlpha;
+            nextZeff = alpha * zeff + (1.0 - alpha) * nextZeff;
+        }
         residual = std::abs(nextZeff - zeff) / std::max(1.0, std::abs(nextZeff));
         zeff = nextZeff;
         result.effectiveChargeHistory.push_back(zeff);

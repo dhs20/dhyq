@@ -67,7 +67,7 @@ Push-Location $root
 try {
     if ($Clean) {
         Write-Host "[build] cleaning xmake state"
-        & xmake f -c -y
+        & xmake clean -y
         if ($LASTEXITCODE -ne 0) {
             throw "xmake clean failed with exit code $LASTEXITCODE"
         }
@@ -84,7 +84,7 @@ try {
     }
 
     Write-Host "[build] compiling"
-    & xmake -y
+    & xmake -y -j 2
     if ($LASTEXITCODE -ne 0) {
         throw "xmake build failed with exit code $LASTEXITCODE"
     }
